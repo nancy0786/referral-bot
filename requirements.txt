@@ -1,10 +1,10 @@
-torch>=2.0.0
+torch==2.1.0
 diffusers==0.27.2
-transformers
-safetensors
+transformers==4.35.2
+safetensors==0.4.0
 gradio==4.24.0
-accelerate
-opencv-python
-Pillow
-requests
+accelerate==0.25.0
+opencv-python==4.9.0.80
+Pillow==9.5.0
+requests==2.31.0
 huggingface_hub==0.20.3
