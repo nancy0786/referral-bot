@@ -7,3 +7,4 @@ accelerate
 opencv-python
 Pillow
 requests
+huggingface_hub==0.20.3
