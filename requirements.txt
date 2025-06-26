@@ -2,7 +2,7 @@ torch==2.1.0
 diffusers==0.27.2
 transformers==4.35.2
 safetensors==0.4.0
-gradio==4.24.0
+gradio==4.44.1
 accelerate==0.25.0
 opencv-python==4.9.0.80
 Pillow==9.5.0
