@@ -1,0 +1,28 @@
+name: Run Private Fooocus AI
+
+on:
+  workflow_dispatch:  # Manual trigger from GitHub UI
+
+jobs:
+  run-ai-app:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: 📥 Checkout Repo
+        uses: actions/checkout@v3
+
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: 📦 Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 🚀 Run Gradio App
+        working-directory: app
+        run: |
+          python main.py
