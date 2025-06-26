@@ -1,0 +1,9 @@
+torch>=2.0.0
+diffusers==0.27.2
+transformers
+safetensors
+gradio==4.24.0
+accelerate
+opencv-python
+Pillow
+requests
