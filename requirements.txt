@@ -8,3 +8,4 @@ opencv-python==4.9.0.80
 Pillow==9.5.0
 requests==2.31.0
 huggingface_hub==0.20.3
+numpy==1.26.4
