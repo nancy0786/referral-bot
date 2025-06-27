@@ -13,16 +13,12 @@ def text2img_ui():
     run_btn = gr.Button("Generate")
     output = gr.Image(label="Generated Image")
 
-    def run(prompt, seed, steps):
-        return generate_txt2img(prompt, seed, steps)
-
-    run_btn.click(run, inputs=[prompt, seed, steps], outputs=output)
-    return [prompt, seed, steps, run_btn, output]
+    run_btn.click(generate_txt2img, inputs=[prompt, seed, steps], outputs=output)
 
 # Inpainting tab
 def inpaint_ui():
     with gr.Row():
-        input_img = gr.Image(label="Upload image", type="numpy", interactive=True)
+        input_img = gr.Image(label="Upload image", type="numpy", tool="sketch")  # tool="sketch" allows masking
     with gr.Row():
         prompt = gr.Textbox(label="Prompt", placeholder="Fix the sky to be bright and blue")
         seed = gr.Number(label="Seed (optional)", value=123)
@@ -30,11 +26,7 @@ def inpaint_ui():
     run_btn = gr.Button("Inpaint")
     output = gr.Image(label="Inpainted Image")
 
-    def run(image, prompt, seed, steps):
-        return generate_inpaint(image, prompt, seed, steps)
-
-    run_btn.click(run, inputs=[input_img, prompt, seed, steps], outputs=output)
-    return [input_img, prompt, seed, steps, run_btn, output]
+    run_btn.click(generate_inpaint, inputs=[input_img, prompt, seed, steps], outputs=output)
 
 # Outpainting tab
 def outpaint_ui():
@@ -47,11 +39,7 @@ def outpaint_ui():
     run_btn = gr.Button("Outpaint")
     output = gr.Image(label="Outpainted Image")
 
-    def run(image, prompt, seed, steps):
-        return generate_outpaint(image, prompt, seed, steps)
-
-    run_btn.click(run, inputs=[input_img, prompt, seed, steps], outputs=output)
-    return [input_img, prompt, seed, steps, run_btn, output]
+    run_btn.click(generate_outpaint, inputs=[input_img, prompt, seed, steps], outputs=output)
 
 # Launch the app
 with gr.Blocks(title="Private Fooocus AI") as demo:
