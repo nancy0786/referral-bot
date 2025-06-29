@@ -18,7 +18,7 @@ def text2img_ui():
 # Inpainting tab
 def inpaint_ui():
     with gr.Row():
-        input_img = gr.Image(label="Upload image", type="numpy", tool="sketch")  # tool="sketch" allows masking
+        input_img = gr.Image(label="Upload image", type="numpy")  # tool="sketch" allows masking
     with gr.Row():
         prompt = gr.Textbox(label="Prompt", placeholder="Fix the sky to be bright and blue")
         seed = gr.Number(label="Seed (optional)", value=123)
