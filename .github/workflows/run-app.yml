@@ -1,7 +1,7 @@
 name: Run Private Fooocus AI
 
 on:
-  workflow_dispatch:  # Manual trigger from GitHub UI
+  workflow_dispatch:
 
 jobs:
   run-ai-app:
@@ -23,6 +23,5 @@ jobs:
           pip install -r requirements.txt
 
       - name: 🚀 Run Gradio App
-        working-directory: app
         run: |
-          python main.py
+          python -m app.main
