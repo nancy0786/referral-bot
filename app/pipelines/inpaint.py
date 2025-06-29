@@ -2,8 +2,7 @@ from diffusers import StableDiffusionInpaintPipeline
 import torch
 import numpy as np
 from PIL import Image
-from app.utils import fallback_image
-from app.utils import resize_image, np_to_pil, pil_to_np
+from ..utils import fallback_image, resize_image, np_to_pil, pil_to_np
 
 pipe = StableDiffusionInpaintPipeline.from_pretrained(
     "runwayml/stable-diffusion-inpainting",
