@@ -1,7 +1,7 @@
 from diffusers import StableDiffusionPipeline
 import torch
 from PIL import Image
-from pipelines.utils import fallback_image
+from app.utils import fallback_image
 from app.utils import resize_image, np_to_pil, pil_to_np
 
 pipe = StableDiffusionPipeline.from_pretrained(
