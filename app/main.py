@@ -1,7 +1,7 @@
 import gradio as gr
-from pipelines.txt2img import generate_txt2img
-from pipelines.inpaint import generate_inpaint
-from pipelines.outpaint import generate_outpaint
+from app.pipelines.txt2img import generate_txt2img
+from app.pipelines.inpaint import generate_inpaint
+from app.pipelines.outpaint import generate_outpaint
 
 # Text-to-Image tab
 def text2img_ui():
