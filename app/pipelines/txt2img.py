@@ -1,6 +1,7 @@
 from diffusers import StableDiffusionPipeline
 import torch
-from PIL import Image, ImageDraw
+from PIL import Image
+from pipelines.utils import fallback_image
 
 pipe = StableDiffusionPipeline.from_pretrained(
     "runwayml/stable-diffusion-v1-5",
@@ -14,10 +15,4 @@ def generate_txt2img(prompt, seed=42, steps=30):
         return image
     except Exception as e:
         print("txt2img failed:", e)
-        return fallback_image()
-
-def fallback_image():
-    blank = Image.new("RGB", (512, 512), (255, 255, 255))
-    draw = ImageDraw.Draw(blank)
-    draw.text((10, 10), "Generation failed", fill=(0, 0, 0))
-    return blank
+        return fallback_image("Generation failed")
