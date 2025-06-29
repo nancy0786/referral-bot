@@ -8,7 +8,7 @@ def resize_image(image: Image.Image, max_size: int = 768) -> Image.Image:
     w, h = image.size
     scale = min(max_size / w, max_size / h)
     if scale < 1:
-        return image.resize((int(w * scale), int(h * scale)), Image.ANTIALIAS)
+        return image.resize((int(w * scale), int(h * scale)), Image.Resampling.LANCZOS)
     return image
 
 def np_to_pil(np_img):
