@@ -27,7 +27,7 @@ SPONSOR_BOT_USERNAME = os.getenv("SPONSOR_BOT_USERNAME")
 
 # Logging setup
 logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.DEBUG
 )
 logger = logging.getLogger(__name__)
 
