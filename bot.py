@@ -15,13 +15,14 @@ from telegram.ext import (
 from telegram.error import TelegramError
 from dotenv import load_dotenv
 import uuid
+import re
 
 # Load environment variables
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHANNEL_ID = os.getenv("CHANNEL_ID")
 ADMIN_IDS = [int(x) for x in os.getenv("ADMIN_IDS").split(",")]
-STORAGE_CHAT_ID = int(os.getenv("STORAGE_CHAT_ID"))
+STORAGE_CHAT_ID = os.getenv("STORAGE_CHAT_ID")
 SPONSOR_BOT_USERNAME = os.getenv("SPONSOR_BOT_USERNAME")
 
 # Logging setup
@@ -29,6 +30,30 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
 logger = logging.getLogger(__name__)
+
+# In-memory cache for message IDs
+USER_MESSAGE_IDS = {}  # {user_id: message_id}
+
+# Resolve channel ID from link or ID
+async def resolve_chat_id(context: ContextTypes.DEFAULT_TYPE, chat_identifier: str):
+    """Convert a channel link or ID to a chat ID."""
+    try:
+        if chat_identifier.isdigit() or chat_identifier.startswith("-"):
+            return int(chat_identifier)
+        chat_identifier = chat_identifier.lstrip("@").split("/")[-1]
+        chat = await context.bot.get_chat(f"@{chat_identifier}")
+        return chat.id
+    except TelegramError as e:
+        logger.error(f"Error resolving chat ID for {chat_identifier}: {e}")
+        raise ValueError(f"Invalid chat identifier: {chat_identifier}")
+
+# Initialize chat IDs
+async def initialize_chat_ids(context: ContextTypes.DEFAULT_TYPE):
+    """Resolve CHANNEL_ID and STORAGE_CHAT_ID from .env."""
+    global CHANNEL_ID, STORAGE_CHAT_ID
+    CHANNEL_ID = await resolve_chat_id(context, CHANNEL_ID)
+    STORAGE_CHAT_ID = await resolve_chat_id(context, STORAGE_CHAT_ID)
+    logger.info(f"Resolved CHANNEL_ID: {CHANNEL_ID}, STORAGE_CHAT_ID: {STORAGE_CHAT_ID}")
 
 # File-based DB functions
 async def save_user_data(context: ContextTypes.DEFAULT_TYPE, user_id: int, data: dict):
@@ -38,18 +63,34 @@ async def save_user_data(context: ContextTypes.DEFAULT_TYPE, user_id: int, data:
         message = await context.bot.send_message(
             chat_id=STORAGE_CHAT_ID, text=f"USER_{user_id}\n{data_str}"
         )
+        USER_MESSAGE_IDS[user_id] = message.message_id
         return message.message_id
     except TelegramError as e:
         logger.error(f"Error saving user data for {user_id}: {e}")
         return None
 
 async def load_user_data(context: ContextTypes.DEFAULT_TYPE, user_id: int):
-    """Load user data from Telegram storage chat."""
+    """Load user data from Telegram storage chat using cached message ID."""
     try:
-        async for message in context.bot.get_chat_history(chat_id=STORAGE_CHAT_ID, limit=1000):
+        if user_id in USER_MESSAGE_IDS:
+            message_id = USER_MESSAGE_IDS[user_id]
+            # Fetch the specific message by copying it
+            message = await context.bot.copy_message(
+                chat_id=STORAGE_CHAT_ID,
+                from_chat_id=STORAGE_CHAT_ID,
+                message_id=message_id,
+                disable_notification=True
+            )
             if message.text and message.text.startswith(f"USER_{user_id}\n"):
                 data = json.loads(message.text.split("\n", 1)[1])
-                data["message_id"] = message.message_id
+                data["message_id"] = message_id
+                return data
+        # Fallback: Search recent updates (limited to avoid rate limits)
+        async for update in context.bot.get_updates(chat_id=STORAGE_CHAT_ID, limit=100):
+            if update.message and update.message.text and update.message.text.startswith(f"USER_{user_id}\n"):
+                data = json.loads(update.message.text.split("\n", 1)[1])
+                USER_MESSAGE_IDS[user_id] = update.message.message_id
+                data["message_id"] = update.message.message_id
                 return data
         return None
     except TelegramError as e:
@@ -74,9 +115,12 @@ async def update_user_data(context: ContextTypes.DEFAULT_TYPE, user_id: int, dat
 async def get_total_users(context: ContextTypes.DEFAULT_TYPE):
     """Count total users in storage chat."""
     count = 0
-    async for message in context.bot.get_chat_history(chat_id=STORAGE_CHAT_ID, limit=1000):
-        if message.text and message.text.startswith("USER_"):
-            count += 1
+    try:
+        async for update in context.bot.get_updates(chat_id=STORAGE_CHAT_ID, limit=1000):
+            if update.message and update.message.text and update.message.text.startswith("USER_"):
+                count += 1
+    except TelegramError as e:
+        logger.error(f"Error counting users: {e}")
     return count
 
 # Initialize user data
@@ -122,6 +166,10 @@ PLANS = {
 # Start command
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /start command."""
+    # Initialize chat IDs on first command
+    if isinstance(CHANNEL_ID, str) or isinstance(STORAGE_CHAT_ID, str):
+        await initialize_chat_ids(context)
+
     user = update.effective_user
     user_id = user.id
     username = user.username or user.first_name
@@ -149,12 +197,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Check channel membership
     if not await check_channel_membership(context, user_id):
         keyboard = [
-            [InlineKeyboardButton("Join Channel", url=f"https://t.me/{CHANNEL_ID.lstrip('@')}")],
+            [InlineKeyboardButton("Join Channel", url=f"https://t.me/{str(CHANNEL_ID).lstrip('@')}")],
             [InlineKeyboardButton("✅ I've Joined", callback_data="check_join")],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text(
-            f"Please join our channel {CHANNEL_ID} to proceed.", reply_markup=reply_markup
+            f"Please join our channel to proceed.", reply_markup=reply_markup
         )
         return
 
@@ -547,17 +595,20 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get("admin_action") != "broadcast":
         await update.message.reply_text("Please select broadcast from admin panel first.")
         return
-    async for message in context.bot.get_chat_history(chat_id=STORAGE_CHAT_ID, limit=1000):
-        if message.text and message.text.startswith("USER_"):
-            user_id = int(message.text.split("\n")[0].split("_")[1])
-            try:
-                await context.bot.copy_message(
-                    chat_id=user_id,
-                    from_chat_id=update.message.chat_id,
-                    message_id=update.message.message_id,
-                )
-            except TelegramError:
-                continue
+    try:
+        async for update in context.bot.get_updates(chat_id=STORAGE_CHAT_ID, limit=1000):
+            if update.message and update.message.text and update.message.text.startswith("USER_"):
+                user_id = int(update.message.text.split("\n")[0].split("_")[1])
+                try:
+                    await context.bot.copy_message(
+                        chat_id=user_id,
+                        from_chat_id=update.message.chat_id,
+                        message_id=update.message.message_id,
+                    )
+                except TelegramError:
+                    continue
+    except TelegramError as e:
+        logger.error(f"Error broadcasting: {e}")
     await update.message.reply_text("Broadcast sent.")
     context.user_data.pop("admin_action", None)
 
