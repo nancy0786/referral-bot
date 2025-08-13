@@ -1,0 +1,133 @@
+<!DOCTYPE html><html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Neon Heart with Arrow</title>
+<style>
+  body {
+    margin: 0;
+    background: black;
+    overflow: hidden;
+  }
+  canvas {
+    display: block;
+  }
+</style>
+</head>
+<body>
+<script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.152.2/examples/js/geometries/HeartGeometry.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.152.2/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.152.2/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.152.2/examples/js/postprocessing/UnrealBloomPass.js"></script><script>
+// === SCENE SETUP ===
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+// Bloom Effect for Neon Glow
+const composer = new THREE.EffectComposer(renderer);
+composer.addPass(new THREE.RenderPass(scene, camera));
+const bloomPass = new THREE.UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
+bloomPass.threshold = 0;
+bloomPass.strength = 2.5; // Glow intensity
+bloomPass.radius = 0.5;
+composer.addPass(bloomPass);
+
+// Camera position
+camera.position.z = 20;
+
+// === PURPLE NEON LINES FROM CORNERS ===
+let lines = [];
+function createNeonLine(x, y) {
+    const material = new THREE.LineBasicMaterial({ color: 0xff00ff });
+    const geometry = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(x, y, -5),
+        new THREE.Vector3(0, 0, 0)
+    ]);
+    const line = new THREE.Line(geometry, material);
+    scene.add(line);
+    lines.push(line);
+}
+
+createNeonLine(-20, -15);
+createNeonLine(20, -15);
+createNeonLine(-20, 15);
+createNeonLine(20, 15);
+
+// === 3D HEART ===
+let heartMesh;
+function createHeart() {
+    const shape = new THREE.Shape();
+    const x = 0, y = 0;
+    shape.moveTo(x + 5, y + 5);
+    shape.bezierCurveTo(x + 5, y + 5, x + 4, y, x, y);
+    shape.bezierCurveTo(x - 6, y, x - 6, y + 7, x - 6, y + 7);
+    shape.bezierCurveTo(x - 6, y + 11, x - 3, y + 15.4, x + 5, y + 19);
+    shape.bezierCurveTo(x + 13, y + 15.4, x + 16, y + 11, x + 16, y + 7);
+    shape.bezierCurveTo(x + 16, y + 7, x + 16, y, x + 10, y);
+    shape.bezierCurveTo(x + 7, y, x + 5, y + 5, x + 5, y + 5);
+
+    const geometry = new THREE.ExtrudeGeometry(shape, {
+        depth: 2,
+        bevelEnabled: true,
+        bevelThickness: 0.5,
+        bevelSize: 0.5,
+        bevelSegments: 5
+    });
+    const material = new THREE.MeshBasicMaterial({ color: 0xff00ff });
+    heartMesh = new THREE.Mesh(geometry, material);
+    heartMesh.position.set(-8, -10, 0);
+    heartMesh.scale.set(0.1, 0.1, 0.1);
+    scene.add(heartMesh);
+}
+
+// === BLUE NEON ARROW ===
+let arrowMesh;
+function createArrow() {
+    const arrowGeometry = new THREE.CylinderGeometry(0.1, 0.1, 20, 32);
+    const arrowMaterial = new THREE.MeshBasicMaterial({ color: 0x00ffff });
+    arrowMesh = new THREE.Mesh(arrowGeometry, arrowMaterial);
+    arrowMesh.rotation.z = Math.PI / 4;
+    arrowMesh.position.set(-20, -15, 0);
+    scene.add(arrowMesh);
+}
+
+// === ANIMATION ===
+let step = 0;
+function animate() {
+    requestAnimationFrame(animate);
+
+    step += 0.01;
+    // Lines moving in
+    lines.forEach((line, i) => {
+        const positions = line.geometry.attributes.position.array;
+        positions[3] = Math.sin(step + i) * 0.5; // x
+        positions[4] = Math.sin(step + i) * 0.5; // y
+        line.geometry.attributes.position.needsUpdate = true;
+    });
+
+    // Heart growing
+    if (step > 2 && heartMesh && heartMesh.scale.x < 1) {
+        heartMesh.scale.x += 0.02;
+        heartMesh.scale.y += 0.02;
+        heartMesh.scale.z += 0.02;
+    }
+
+    // Arrow moving in
+    if (step > 6 && arrowMesh && arrowMesh.position.x < 0) {
+        arrowMesh.position.x += 0.2;
+        arrowMesh.position.y += 0.15;
+    }
+
+    composer.render();
+}
+
+// Start sequence
+tsetTimeout(() => { createHeart(); }, 2000);
+setTimeout(() => { createArrow(); }, 6000);
+
+animate();
+</script></body>
+</html>
