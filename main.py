@@ -54,3 +54,10 @@ from handlers.tasks import show_tasks, handle_task_done
 
 app.add_handler(CallbackQueryHandler(show_tasks, pattern="^tasks$"))
 app.add_handler(CallbackQueryHandler(handle_task_done, pattern="^task_done_"))
+
+[InlineKeyboardButton("👤 Profile", callback_data="profile")]
+
+
+from handlers.profile import show_profile
+
+app.add_handler(CallbackQueryHandler(show_profile, pattern="^profile$"))
