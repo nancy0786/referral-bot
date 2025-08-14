@@ -61,3 +61,10 @@ app.add_handler(CallbackQueryHandler(handle_task_done, pattern="^task_done_"))
 from handlers.profile import show_profile
 
 app.add_handler(CallbackQueryHandler(show_profile, pattern="^profile$"))
+
+[InlineKeyboardButton("🔗 My Referral Link", callback_data="ref_link")]
+
+
+from handlers.referral import send_referral_link
+
+app.add_handler(CallbackQueryHandler(send_referral_link, pattern="^ref_link$"))
