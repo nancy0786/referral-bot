@@ -67,3 +67,11 @@ if not profile.get("sponsor_verified", False):
     await ask_sponsor_verification(update, context)
     await log_new_user(context, user, ref_code)
     return
+
+
+from handlers.menu import send_main_menu
+
+# ...
+# After force join + sponsor verification passed:
+await send_main_menu(update, context)
+await log_new_user(context, user, ref_code)
