@@ -59,3 +59,20 @@ async def add_pending_referral(inviter_id: int, referred_user_id: int) -> None:
         pend.add(referred_user_id)
         inviter["referrals"]["pending"] = list(pend)
         await save_user(inviter_id, inviter)
+
+
+        DEFAULT_USER = {
+    "user_id": None,
+    "username": None,
+    "credits": 0,
+    "plan": {"name": "Free", "expires_at": None},
+    "usage": {"videos_watched_today": 0, "last_watch_reset": None},
+    "referrals": {
+        "invited_by": None,
+        "total": 0,
+        "successful": 0,
+        "pending": []
+    },
+    "badges": [],
+    "sponsor_verified": False  # <-- NEW
+}        
