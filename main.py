@@ -48,3 +48,9 @@ app.add_handler(CallbackQueryHandler(handle_watch_video, pattern="^watch_"))
 from handlers.videos import handle_download_video
 
 app.add_handler(CallbackQueryHandler(handle_download_video, pattern="^download_"))
+
+
+from handlers.tasks import show_tasks, handle_task_done
+
+app.add_handler(CallbackQueryHandler(show_tasks, pattern="^tasks$"))
+app.add_handler(CallbackQueryHandler(handle_task_done, pattern="^task_done_"))
