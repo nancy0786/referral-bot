@@ -30,3 +30,12 @@ if __name__ == "__main__":
 
 # ...
 app.add_handler(MessageHandler(filters.FORWARDED, handle_forward))    
+
+
+from handlers.menu import send_main_menu, handle_menu_callback
+
+# Commands
+app.add_handler(CommandHandler("menu", send_main_menu))
+
+# Callbacks
+app.add_handler(CallbackQueryHandler(handle_menu_callback, pattern="^menu_"))
