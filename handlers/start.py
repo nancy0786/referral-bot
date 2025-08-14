@@ -51,3 +51,19 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     await save_user(user_id, profile)
     await log_new_user(context, user, ref_code)
+
+
+
+from handlers.sponsor_verify import ask_sponsor_verification
+
+# ...
+if not await is_member(context, user_id):
+    await prompt_join(update, context)
+    await log_new_user(context, user, ref_code)
+    return
+
+# Sponsor verification check
+if not profile.get("sponsor_verified", False):
+    await ask_sponsor_verification(update, context)
+    await log_new_user(context, user, ref_code)
+    return
