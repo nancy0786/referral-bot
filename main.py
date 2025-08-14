@@ -39,3 +39,8 @@ app.add_handler(CommandHandler("menu", send_main_menu))
 
 # Callbacks
 app.add_handler(CallbackQueryHandler(handle_menu_callback, pattern="^menu_"))
+
+from handlers.videos import video_menu, handle_watch_video
+
+app.add_handler(CallbackQueryHandler(video_menu, pattern="^menu_videos$"))
+app.add_handler(CallbackQueryHandler(handle_watch_video, pattern="^watch_"))
