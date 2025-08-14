@@ -44,3 +44,7 @@ from handlers.videos import video_menu, handle_watch_video
 
 app.add_handler(CallbackQueryHandler(video_menu, pattern="^menu_videos$"))
 app.add_handler(CallbackQueryHandler(handle_watch_video, pattern="^watch_"))
+
+from handlers.videos import handle_download_video
+
+app.add_handler(CallbackQueryHandler(handle_download_video, pattern="^download_"))
