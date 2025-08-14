@@ -75,3 +75,36 @@ from handlers.menu import send_main_menu
 # After force join + sponsor verification passed:
 await send_main_menu(update, context)
 await log_new_user(context, user, ref_code)
+
+
+from utils.db import get_user_data, save_user_data
+
+REFERRAL_CREDIT = 2
+BADGE_LEVELS = {1: "Referrer Lv1", 5: "Referrer Lv2", 10: "Referrer Lv3"}
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    args = context.args
+
+    # Handle referral
+    if args:
+        try:
+            ref_id = int(args[0])
+            if ref_id != user_id:  # prevent self-referral
+                ref_data = get_user_data(ref_id)
+                if user_id not in ref_data.get("referrals", []):
+                    ref_data.setdefault("referrals", []).append(user_id)
+                    ref_data["credits"] = ref_data.get("credits", 0) + REFERRAL_CREDIT
+
+                    # Badge logic
+                    total_refs = len(ref_data["referrals"])
+                    if total_refs in BADGE_LEVELS:
+                        if BADGE_LEVELS[total_refs] not in ref_data.get("badges", []):
+                            ref_data.setdefault("badges", []).append(BADGE_LEVELS[total_refs])
+
+                    save_user_data(ref_id, ref_data)
+        except ValueError:
+            pass
+
+    # Continue existing /start flow
+    # ... rest of Step 1 code ...
