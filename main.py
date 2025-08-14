@@ -24,3 +24,9 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+    from handlers.sponsor_verify import handle_forward
+
+# ...
+app.add_handler(MessageHandler(filters.FORWARDED, handle_forward))    
