@@ -74,3 +74,55 @@ async def handle_watch_video(update: Update, context: ContextTypes.DEFAULT_TYPE)
     vid_id = query.data.replace("watch_", "")
     await query.answer()
     await query.edit_message_text(f"▶️ Playing {vid_id} ... (video sending here)")
+
+async def send_video_list(update: Update):
+    keyboard = [
+        [
+            InlineKeyboardButton("▶️ Watch Video 1", callback_data="watch_vid1"),
+            InlineKeyboardButton("⬇️ Download Video 1", callback_data="download_vid1")
+        ],
+        [
+            InlineKeyboardButton("▶️ Watch Video 2", callback_data="watch_vid2"),
+            InlineKeyboardButton("⬇️ Download Video 2", callback_data="download_vid2")
+        ],
+    ]
+    await update.callback_query.edit_message_text(
+        "🎥 Available Videos:", reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+async def handle_download_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    data = get_user_data(user_id)
+    plan = data.get("plan", "free")
+    credits = data.get("credits", 0)
+
+    # Premium → free download
+    if plan == "premium":
+        await send_download(update)
+        return
+
+    # Credit plan → deduct credit if available
+    if plan == "credit":
+        if credits > 0:
+            data["credits"] -= 1
+            save_user_data(user_id, data)
+            await send_download(update)
+            return
+        else:
+            await update.callback_query.edit_message_text(
+                "💳 You have no credits left.\nEarn more via tasks or upgrade."
+            )
+            return
+
+    # Free plan → block download
+    if plan == "free":
+        await update.callback_query.edit_message_text(
+            "⛔ Downloads are not available on Free Plan.\nUpgrade or earn credits."
+        )
+
+async def send_download(update: Update):
+    vid_id = update.callback_query.data.replace("download_", "")
+    await update.callback_query.answer()
+    await update.callback_query.edit_message_text(f"⬇️ Sending {vid_id} file...")
+    # Here send the actual file:
+    # await update.effective_chat.send_document(open(f"videos/{vid_id}.mp4", "rb"))
