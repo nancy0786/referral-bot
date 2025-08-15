@@ -137,3 +137,15 @@ app.add_handler(MessageHandler(filters.ALL, activity_middleware), group=-1)
 app.job_queue.run_repeating(session.check_sessions, interval=60, first=60)
 
 app.run_polling()
+
+
+
+from handlers import admin
+
+app.add_handler(CommandHandler("broadcast", admin.broadcast))
+app.add_handler(CommandHandler("setwelcome", admin.setwelcome))
+app.add_handler(CommandHandler("addcredits", admin.addcredits))
+app.add_handler(CommandHandler("setplan", admin.setplan))
+app.add_handler(CommandHandler("stats", admin.stats))
+app.add_handler(CommandHandler("listusers", admin.listusers))
+
