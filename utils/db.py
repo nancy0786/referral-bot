@@ -76,3 +76,48 @@ async def add_pending_referral(inviter_id: int, referred_user_id: int) -> None:
     "badges": [],
     "sponsor_verified": False  # <-- NEW
 }        
+
+
+import json, os, time
+
+DB_PATH = "db"
+
+def get_user_data(user_id):
+    file_path = f"{DB_PATH}/{user_id}.json"
+    if not os.path.exists(file_path):
+        return {
+            "credits": 0,
+            "plan": "Free",
+            "plan_expiry": None,
+            "referrals": [],
+            "badges": [],
+            "redeemed_codes": [],
+            "usage_today": 0,
+            "last_reset": time.time(),
+            "sponsor_verified": False,
+            "last_active": time.time(),
+            "active_messages": []
+        }
+    with open(file_path, "r") as f:
+        return json.load(f)
+
+def save_user_data(user_id, data):
+    os.makedirs(DB_PATH, exist_ok=True)
+    with open(f"{DB_PATH}/{user_id}.json", "w") as f:
+        json.dump(data, f)
+
+def update_last_active(user_id):
+    data = get_user_data(user_id)
+    data["last_active"] = time.time()
+    save_user_data(user_id, data)
+
+def add_active_message(user_id, message_id):
+    data = get_user_data(user_id)
+    if message_id not in data["active_messages"]:
+        data["active_messages"].append(message_id)
+    save_user_data(user_id, data)
+
+def clear_active_messages(user_id):
+    data = get_user_data(user_id)
+    data["active_messages"] = []
+    save_user_data(user_id, data)
