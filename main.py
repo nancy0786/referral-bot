@@ -5,7 +5,6 @@ from dotenv import load_dotenv
 from telegram import InlineKeyboardButton, Update
 from telegram.ext import (
     Application,
-    ApplicationBuilder,
     CommandHandler,
     CallbackQueryHandler,
     MessageHandler,
@@ -91,6 +90,7 @@ def main():
     if not BOT_TOKEN:
         raise SystemExit("BOT_TOKEN missing in .env")
 
+    # Build the app once
     app = Application.builder().token(BOT_TOKEN).build()
 
     # Middleware
@@ -130,26 +130,13 @@ def main():
     # General messages (global check)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo_command))
 
-    # Background jobs
-    app = Application.builder().token(BOT_TOKEN).build()
-
-    # Get the job queue after building
+    # Background job setup
     job_queue = app.job_queue
-
-    # Add your repeating job
     job_queue.run_repeating(session.check_sessions, interval=60, first=60)
 
-    async def start(update, context):
-        await update.message.reply_text("Bot is working!")
-
-    async def echo(update, context):
-        await update.message.reply_text(f"You said: {update.message.text}")
-
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
-    
     logger.info("Bot started...")
     app.run_polling(allowed_updates=["message", "callback_query"])
+
 
 # ========================
 # ENTRY POINT
