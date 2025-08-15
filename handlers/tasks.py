@@ -1,3 +1,6 @@
+from telegram import Update
+from telegram.ext import ContextTypes
+
 TASKS = [
     {"id": "join_channel", "title": "Join Our Partner Channel", "reward": 2, "type": "telegram_channel", "link": "https://t.me/partner_channel"},
     {"id": "follow_instagram", "title": "Follow Our Instagram", "reward": 1, "type": "external", "link": "https://instagram.com/example"},
