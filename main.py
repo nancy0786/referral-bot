@@ -110,3 +110,30 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+
+
+
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, CallbackQueryHandler
+from handlers import start, sponsor_verify, menu, videos, download, tasks, profile, referral, redeem, session
+from utils.db import update_last_active
+
+TOKEN = "YOUR_BOT_TOKEN"
+
+app = ApplicationBuilder().token(TOKEN).build()
+
+# Update last active on every user interaction
+def activity_middleware(update, context):
+    if update.effective_user:
+        update_last_active(update.effective_user.id)
+app.add_handler(MessageHandler(filters.ALL, activity_middleware), group=-1)
+
+# Register your other handlers here...
+# Example:
+# app.add_handler(CommandHandler("start", start.start_handler))
+
+# Background job to check session expiry
+app.job_queue.run_repeating(session.check_sessions, interval=60, first=60)
+
+app.run_polling()
