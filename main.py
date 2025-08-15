@@ -179,3 +179,53 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
+from telegram import Update
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, CallbackContext
+from plan_system import check_and_update_expiry, refill_free_plan_credits
+from admin_commands import admin_set_plan
+from user_system import ensure_user_registered
+
+# Called for every message or command
+async def global_user_check(update: Update, context: CallbackContext):
+    user_id = str(update.effective_user.id)
+
+    # Ensure user exists in DB
+    ensure_user_registered(user_id, update.effective_user)
+
+    # Step 13: Check expiry + refill free plan
+    check_and_update_expiry(user_id)
+    refill_free_plan_credits(user_id)
+
+
+async def start(update: Update, context: CallbackContext):
+    await global_user_check(update, context)
+    await update.message.reply_text("👋 Welcome back! Your plan details are up-to-date.")
+
+
+async def echo(update: Update, context: CallbackContext):
+    await global_user_check(update, context)
+    await update.message.reply_text("✅ Message received and plan checked.")
+
+
+def main():
+    app = ApplicationBuilder().token("YOUR_BOT_TOKEN").build()
+
+    # Admin command to set plan
+    app.add_handler(CommandHandler("set_plan", admin_set_plan))
+
+    # User start
+    app.add_handler(CommandHandler("start", start))
+
+    # General messages
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
+
+    app.run_polling()
+
+
+if __name__ == "__main__":
+    main()
+
+
