@@ -38,3 +38,4 @@ DATA_FOLDER = os.path.join(os.path.dirname(__file__), "db")
 INDEX_FILENAME = "backup_index"
 
 DB_FOLDER = DATA_FOLDER
+BACKUP_CHANNEL_ID = PRIVATE_DB_CHANNEL_ID
