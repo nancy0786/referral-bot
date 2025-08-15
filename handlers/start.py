@@ -6,7 +6,7 @@ import config
 from telegram import Update
 from telegram.ext import ContextTypes
 from handlers.force_join import is_member, prompt_join
-from handlers.sponsor_verify import ask_sponsor_verification
+from handlers.sponsor_verify import ask_sponsor_verification, auto_verify_sponsor
 from handlers.menu import send_main_menu
 from utils.db import (
     get_user,
@@ -107,12 +107,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     # --------------------------------------------------------
-    # Sponsor Verification Check
+    # Sponsor Verification Check (Automatic)
     # --------------------------------------------------------
     if not profile.get("sponsor_verified", False):
-        await ask_sponsor_verification(update, context)
-        await log_new_user(context, user, ref_code)
-        return
+        verified = await auto_verify_sponsor(update, context)
+        if not verified:
+            await ask_sponsor_verification(update, context)
+            await log_new_user(context, user, ref_code)
+            return
 
     # --------------------------------------------------------
     # Save profile to DB and backup channel
