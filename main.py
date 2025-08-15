@@ -62,15 +62,18 @@ logger = logging.getLogger(__name__)
 # ========================
 async def activity_middleware(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user:
-        update_last_active(update.effective_user.id)
+        # Await the async DB function
+        await update_last_active(update.effective_user.id)  # <-- fixed
 
 async def global_user_check(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user:
         user_id = str(update.effective_user.id)
-        await ensure_user_registered(user_id, update.effective_user)  # async
+        # Only await if ensure_user_registered is async, else call normally
+        result = ensure_user_registered(user_id, update.effective_user)
+        if result:  # If async returns coroutine, await it
+            await result
         check_and_update_expiry(user_id)
         refill_free_plan_credits(user_id)
-
 # ========================
 # BASIC COMMANDS
 # ========================
