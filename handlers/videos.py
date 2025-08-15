@@ -1,128 +1,113 @@
+# handlers/video_handler.py
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
-import json, os, time
+from utils.db import get_user_data, save_user_data
+import time
 
-USER_DATA_DIR = "user_data"
+# Your channel where videos are uploaded
+VIDEO_CHANNEL = "@YourVideoChannel"
 
-def get_user_data(user_id):
-    path = f"{USER_DATA_DIR}/{user_id}.json"
-    if not os.path.exists(path):
-        return None
-    with open(path, "r") as f:
-        return json.load(f)
+async def get_video_by_number(bot, number: str):
+    """Fetch the video from the channel by its numeric tag in caption."""
+    try:
+        async for msg in bot.get_chat(VIDEO_CHANNEL).iter_history(limit=200):
+            if msg.caption and number in msg.caption:
+                if msg.video:
+                    return msg.video.file_id
+                elif msg.document:
+                    return msg.document.file_id
+    except Exception as e:
+        print(f"Error fetching video: {e}")
+    return None
 
-def save_user_data(user_id, data):
-    os.makedirs(USER_DATA_DIR, exist_ok=True)
-    with open(f"{USER_DATA_DIR}/{user_id}.json", "w") as f:
-        json.dump(data, f, indent=2)
+async def send_video_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Prompt user to enter video number."""
+    await update.callback_query.edit_message_text(
+        "🎥 Please send the video number you want to watch (e.g., 1, 2, 3):"
+    )
+    context.user_data["awaiting_video_number"] = True
 
-async def video_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_video_number(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handles user input for video number."""
+    if not context.user_data.get("awaiting_video_number"):
+        return
+
+    vid_num = update.message.text.strip()
     user_id = update.effective_user.id
     data = get_user_data(user_id)
 
-    if not data:
-        await update.callback_query.edit_message_text("❌ User data not found.")
-        return
-
     plan = data.get("plan", "free")
     credits = data.get("credits", 0)
-    expiry = data.get("plan_expiry", None)
+    expiry = data.get("plan_expiry", 0)
+    now = time.time()
 
-    # Premium plan check
+    # Check plan and deduct credits if necessary
     if plan == "premium":
-        if expiry and time.time() > expiry:
+        if expiry and now > expiry:
             data["plan"] = "free"
             save_user_data(user_id, data)
-            await update.callback_query.edit_message_text(
-                "⚠️ Your premium plan has expired. Please upgrade again."
-            )
+            await update.message.reply_text("⚠️ Your Premium plan expired. Upgrading needed.")
             return
-        else:
-            await send_video_list(update)
-            return
-
-    # Credit-based check
-    if plan == "credit":
+    elif plan == "credit":
         if credits > 0:
             data["credits"] -= 1
             save_user_data(user_id, data)
-            await send_video_list(update)
-            return
         else:
-            await update.callback_query.edit_message_text(
-                "💳 You have no credits left.\n\nEarn more via tasks or upgrade your plan."
-            )
+            await update.message.reply_text("💳 No credits left. Complete tasks or upgrade plan.")
             return
-
-    # Free plan restriction
-    if plan == "free":
-        await update.callback_query.edit_message_text(
-            "🔓 You are on the Free Plan.\n\nUpgrade to Premium or use credits to watch videos."
-        )
-
-async def send_video_list(update: Update):
-    keyboard = [
-        [InlineKeyboardButton("📹 Video 1", callback_data="watch_vid1")],
-        [InlineKeyboardButton("📹 Video 2", callback_data="watch_vid2")],
-    ]
-    await update.callback_query.edit_message_text(
-        "🎥 Available Videos:", reply_markup=InlineKeyboardMarkup(keyboard)
-    )
-
-async def handle_watch_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    vid_id = query.data.replace("watch_", "")
-    await query.answer()
-    await query.edit_message_text(f"▶️ Playing {vid_id} ... (video sending here)")
-
-async def send_video_list(update: Update):
-    keyboard = [
-        [
-            InlineKeyboardButton("▶️ Watch Video 1", callback_data="watch_vid1"),
-            InlineKeyboardButton("⬇️ Download Video 1", callback_data="download_vid1")
-        ],
-        [
-            InlineKeyboardButton("▶️ Watch Video 2", callback_data="watch_vid2"),
-            InlineKeyboardButton("⬇️ Download Video 2", callback_data="download_vid2")
-        ],
-    ]
-    await update.callback_query.edit_message_text(
-        "🎥 Available Videos:", reply_markup=InlineKeyboardMarkup(keyboard)
-    )
-
-async def handle_download_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    data = get_user_data(user_id)
-    plan = data.get("plan", "free")
-    credits = data.get("credits", 0)
-
-    # Premium → free download
-    if plan == "premium":
-        await send_download(update)
+    elif plan == "free":
+        await update.message.reply_text("🔓 Free plan: Only limited videos available. Upgrade for full access.")
         return
 
-    # Credit plan → deduct credit if available
-    if plan == "credit":
+    # Fetch video dynamically
+    video_file_id = await get_video_by_number(context.bot, vid_num)
+    if not video_file_id:
+        await update.message.reply_text("❌ Video not found. Make sure the number is correct.")
+        return
+
+    # Send video with inline download button
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("⬇️ Download", callback_data=f"download_{vid_num}")]
+    ])
+    await update.message.reply_video(video_file_id, caption=f"🎥 Video {vid_num}", reply_markup=keyboard)
+    context.user_data["awaiting_video_number"] = False
+
+async def handle_download_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle download request with plan/credits check."""
+    query = update.callback_query
+    vid_num = query.data.replace("download_", "")
+    user_id = query.from_user.id
+    data = get_user_data(user_id)
+
+    plan = data.get("plan", "free")
+    credits = data.get("credits", 0)
+    expiry = data.get("plan_expiry", 0)
+    now = time.time()
+
+    # Check permissions
+    if plan == "premium":
+        if expiry and now > expiry:
+            data["plan"] = "free"
+            save_user_data(user_id, data)
+            await query.edit_message_text("⚠️ Premium expired. Cannot download.")
+            return
+    elif plan == "credit":
         if credits > 0:
             data["credits"] -= 1
             save_user_data(user_id, data)
-            await send_download(update)
-            return
         else:
-            await update.callback_query.edit_message_text(
-                "💳 You have no credits left.\nEarn more via tasks or upgrade."
-            )
+            await query.answer("💳 No credits left.", show_alert=True)
             return
+    elif plan == "free":
+        await query.answer("⛔ Free plan cannot download videos.", show_alert=True)
+        return
 
-    # Free plan → block download
-    if plan == "free":
-        await update.callback_query.edit_message_text(
-            "⛔ Downloads are not available on Free Plan.\nUpgrade or earn credits."
-        )
+    # Fetch video dynamically
+    video_file_id = await get_video_by_number(context.bot, vid_num)
+    if not video_file_id:
+        await query.answer("❌ Video not found.", show_alert=True)
+        return
 
-async def send_download(update: Update):
-    vid_id = update.callback_query.data.replace("download_", "")
-    await update.callback_query.answer()
-    await update.callback_query.edit_message_text(f"⬇️ Sending {vid_id} file...")
-    # Here send the actual file:
-    # await update.effective_chat.send_document(open(f"videos/{vid_id}.mp4", "rb"))
+    # Send video file
+    await query.message.reply_video(video_file_id, caption=f"⬇️ Download Video {vid_num}")
+    await query.answer("🎉 Video sent for download!")
