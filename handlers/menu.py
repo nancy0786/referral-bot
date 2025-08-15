@@ -60,3 +60,9 @@ async def send_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, edi
         # If called from /menu command
         msg = update.message or update.callback_query.message
         await msg.reply_text("📋 **Main Menu**", reply_markup=markup, parse_mode="Markdown")
+
+
+
+elif data == "menu_tasks":
+    from handlers.giveaways import show_giveaways
+    await show_giveaways(update, context)
