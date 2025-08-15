@@ -11,3 +11,6 @@ WELCOME_FILE = os.path.join("data", "welcome.txt")
 
 SPONSOR_BOT_USERNAME = os.getenv("SPONSOR_BOT_USERNAME", "").strip()
 SPONSOR_BOT_ID = int(os.getenv("SPONSOR_BOT_ID", "0").strip())
+
+# config.py (optional additions)
+REDEEM_CODE_LENGTH = 16
