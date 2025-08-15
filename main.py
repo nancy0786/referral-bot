@@ -68,3 +68,45 @@ app.add_handler(CallbackQueryHandler(show_profile, pattern="^profile$"))
 from handlers.referral import send_referral_link
 
 app.add_handler(CallbackQueryHandler(send_referral_link, pattern="^ref_link$"))
+
+
+# main.py (additions)
+import logging
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters
+import config
+from handlers.start import start
+from handlers.force_join import handle_recheck_join, RECHECK_BTN_DATA
+from handlers.menu import send_main_menu, handle_menu_callback  # if you have it
+from handlers.redeem import start_redeem_command, start_redeem_from_menu, handle_redeem_text
+
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    level=logging.INFO
+)
+logger = logging.getLogger(__name__)
+
+def main() -> None:
+    if not config.BOT_TOKEN:
+        raise SystemExit("BOT_TOKEN missing in .env")
+
+    app = Application.builder().token(config.BOT_TOKEN).build()
+
+    # Commands
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("menu", send_main_menu))
+    app.add_handler(CommandHandler("redeem", start_redeem_command))
+
+    # Callback buttons
+    app.add_handler(CallbackQueryHandler(handle_recheck_join, pattern=f"^{RECHECK_BTN_DATA}$"))
+    app.add_handler(CallbackQueryHandler(start_redeem_from_menu, pattern="^menu_redeem$"))
+    # Keep your other menu callbacks like:
+    # app.add_handler(CallbackQueryHandler(handle_menu_callback, pattern="^menu_"))
+
+    # Text handler for redeem code input (only works when awaiting flag is set)
+    app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_redeem_text))
+
+    logger.info("Bot started...")
+    app.run_polling(allowed_updates=["message", "callback_query"])
+
+if __name__ == "__main__":
+    main()
