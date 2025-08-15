@@ -107,15 +107,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     # --------------------------------------------------------
-    # Sponsor Verification Check (Automatic)
+    # Sponsor Verification Check
     # --------------------------------------------------------
     if not profile.get("sponsor_verified", False):
-        verified = await auto_verify_sponsor(update, context)
-        if not verified:
+        verified = await check_sponsor_message(user_id, context)
+        if verified:
+            profile["sponsor_verified"] = True
+            await save_user(user_id, profile)
+        else:
             await ask_sponsor_verification(update, context)
             await log_new_user(context, user, ref_code)
             return
-
     # --------------------------------------------------------
     # Save profile to DB and backup channel
     # --------------------------------------------------------
