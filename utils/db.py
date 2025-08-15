@@ -130,3 +130,41 @@ async def clear_active_messages(user_id: int) -> None:
     user = await get_user(user_id)
     user["active_messages"] = []
     await save_user(user_id, user)
+
+
+
+# Backward compatibility for older handlers
+async def get_user_data(user_id: int):
+    """Return user data in old-style dict format for legacy handlers."""
+    user = await get_user(user_id)
+    # Convert async structure to match old get_user_data
+    return {
+        "credits": user.get("credits", 0),
+        "plan": user.get("plan", {}).get("name", "Free"),
+        "plan_expiry": user.get("plan", {}).get("expires_at"),
+        "referrals": user.get("referrals", {}).get("pending", []),
+        "badges": user.get("badges", []),
+        "redeemed_codes": user.get("redeemed_codes", []),
+        "usage_today": user.get("usage", {}).get("videos_watched_today", 0),
+        "last_reset": user.get("usage", {}).get("last_watch_reset"),
+        "sponsor_verified": user.get("sponsor_verified", False),
+        "last_active": user.get("last_active", 0),
+        "active_messages": user.get("active_messages", [])
+    }
+
+async def save_user_data(user_id: int, data: dict):
+    """Save user data in old-style format for legacy handlers."""
+    user = await get_user(user_id)
+    user["credits"] = data.get("credits", user.get("credits", 0))
+    user["plan"]["name"] = data.get("plan", user.get("plan", {}).get("name", "Free"))
+    user["plan"]["expires_at"] = data.get("plan_expiry", user.get("plan", {}).get("expires_at"))
+    user["referrals"]["pending"] = data.get("referrals", user.get("referrals", {}).get("pending", []))
+    user["badges"] = data.get("badges", user.get("badges", []))
+    user["redeemed_codes"] = data.get("redeemed_codes", user.get("redeemed_codes", []))
+    user["usage"]["videos_watched_today"] = data.get("usage_today", user.get("usage", {}).get("videos_watched_today", 0))
+    user["usage"]["last_watch_reset"] = data.get("last_reset", user.get("usage", {}).get("last_watch_reset"))
+    user["sponsor_verified"] = data.get("sponsor_verified", user.get("sponsor_verified", False))
+    user["last_active"] = data.get("last_active", user.get("last_active", 0))
+    user["active_messages"] = data.get("active_messages", user.get("active_messages", []))
+
+    await save_user(user_id, user)
