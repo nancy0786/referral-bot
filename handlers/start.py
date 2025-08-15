@@ -108,3 +108,44 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Continue existing /start flow
     # ... rest of Step 1 code ...
+
+
+
+
+# handlers/start.py
+from telegram import Update
+from telegram.ext import ContextTypes
+from utils.db import get_user, save_user
+from handlers.force_join import is_member, prompt_join
+import config
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = update.effective_user
+    user_id = user.id
+    username = user.username
+
+    # Load or create user
+    profile = await get_user(user_id, username=username)
+
+    # referral detection etc. (keep your logic)
+    if context.args:
+        ref = context.args[0]
+        if ref.isdigit():
+            ref_id = int(ref)
+            if ref_id != user_id and profile["referrals"].get("invited_by") is None:
+                profile["referrals"]["invited_by"] = ref_id
+                # ... update inviter pending etc.
+
+    # Force join check
+    if not await is_member(context, user_id):
+        await prompt_join(update, context)
+        return
+
+    # Sponsor verification check (your existing code)
+    # ...
+
+    # Save profile (this will create local file and upload to backup channel)
+    await save_user(user_id, profile, backup_sync=True)
+
+    # send welcome & menu etc.
+    await update.message.reply_text("Welcome! You're verified.")
