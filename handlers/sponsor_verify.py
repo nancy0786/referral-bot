@@ -27,6 +27,7 @@ async def ask_sponsor_verification(update: Update, context: ContextTypes.DEFAULT
     )
     await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=kb)
 
+
 async def auto_verify_sponsor(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     """
     Automatically verify user via Sponsor Bot.
@@ -63,3 +64,23 @@ async def auto_verify_sponsor(update: Update, context: ContextTypes.DEFAULT_TYPE
         return True
 
     return False
+
+
+# -----------------------------
+# Handle forwarded messages
+# -----------------------------
+async def handle_forward(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Handles forwarded messages for sponsor verification.
+    Marks the user as verified if forward detected.
+    """
+    user = update.effective_user
+    user_id = user.id
+    profile = await get_user(user_id)
+
+    if not profile.get("sponsor_verified", False):
+        profile["sponsor_verified"] = True
+        await save_user(user_id, profile)
+        await update.message.reply_text(
+            "✅ Sponsor verification successful via forwarded message!"
+        )
