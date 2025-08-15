@@ -36,3 +36,5 @@ DATA_FOLDER = os.path.join(os.path.dirname(__file__), "db")
 
 # Backup index filename (used for pinned message content)
 INDEX_FILENAME = "backup_index"
+
+DB_FOLDER = DATA_FOLDER
