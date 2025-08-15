@@ -1,0 +1,14 @@
+{
+  "codes": {
+    "AB12CD34EF56GH78": {
+      "reward": { "credits": 25 },
+      "used_by": null,
+      "used_at": null
+    },
+    "ZXCVBNMASDFGHJKL": {
+      "reward": { "plan": { "name": "Premium", "days": 7 } },
+      "used_by": null,
+      "used_at": null
+    }
+  }
+}
