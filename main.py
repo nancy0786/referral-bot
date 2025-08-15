@@ -139,6 +139,15 @@ def main():
     # Add your repeating job
     job_queue.run_repeating(session.check_sessions, interval=60, first=60)
 
+    async def start(update, context):
+        await update.message.reply_text("Bot is working!")
+
+    async def echo(update, context):
+        await update.message.reply_text(f"You said: {update.message.text}")
+
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
+    
     logger.info("Bot started...")
     app.run_polling(allowed_updates=["message", "callback_query"])
 
