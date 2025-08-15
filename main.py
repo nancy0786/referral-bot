@@ -12,12 +12,11 @@ from telegram.ext import (
     CallbackContext
 )
 
-# Load environment variables
+# ========================
+# LOAD ENV
+# ========================
 load_dotenv()
 
-# ========================
-# CONFIGURATION
-# ========================
 BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
 FORCE_JOIN_CHANNEL = os.getenv("FORCE_JOIN_CHANNEL", "@playhubby").strip()
 ADMIN_IDS = [int(x) for x in os.getenv("ADMIN_IDS", "").replace(" ", "").split(",") if x]
@@ -26,7 +25,6 @@ WELCOME_FILE = os.path.join("data", "welcome.txt")
 SPONSOR_BOT_USERNAME = os.getenv("SPONSOR_BOT_USERNAME", "").strip()
 SPONSOR_BOT_ID = int(os.getenv("SPONSOR_BOT_ID", "0").strip())
 REDEEM_CODE_LENGTH = 16
-
 PRIVATE_DB_CHANNEL_ID = int(os.getenv("PRIVATE_DB_CHANNEL_ID", "0").strip() or 0)
 DATA_FOLDER = os.path.join(os.path.dirname(__file__), "db")
 INDEX_FILENAME = "backup_index"
@@ -67,10 +65,11 @@ async def activity_middleware(update: Update, context: CallbackContext):
         update_last_active(update.effective_user.id)
 
 async def global_user_check(update: Update, context: CallbackContext):
-    user_id = str(update.effective_user.id)
-    ensure_user_registered(user_id, update.effective_user)
-    check_and_update_expiry(user_id)
-    refill_free_plan_credits(user_id)
+    if update.effective_user:
+        user_id = str(update.effective_user.id)
+        await ensure_user_registered(user_id, update.effective_user)
+        check_and_update_expiry(user_id)
+        refill_free_plan_credits(user_id)
 
 # ========================
 # BASIC COMMANDS
@@ -90,14 +89,13 @@ def main():
     if not BOT_TOKEN:
         raise SystemExit("BOT_TOKEN missing in .env")
 
-    # Build the app once
     app = Application.builder().token(BOT_TOKEN).build()
 
     # Middleware
     app.add_handler(MessageHandler(filters.ALL, activity_middleware), group=-1)
 
     # Commands
-    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("menu", send_main_menu))
     app.add_handler(CommandHandler("redeem", start_redeem_command))
     app.add_handler(CommandHandler("restore_db", restore_db_command))
@@ -109,7 +107,7 @@ def main():
     app.add_handler(CommandHandler("stats", admin.stats))
     app.add_handler(CommandHandler("listusers", admin.listusers))
 
-    # Callback buttons
+    # CallbackQueryHandlers
     app.add_handler(CallbackQueryHandler(handle_recheck_join, pattern=f"^{RECHECK_BTN_DATA}$"))
     app.add_handler(CallbackQueryHandler(start_redeem_from_menu, pattern="^menu_redeem$"))
     app.add_handler(CallbackQueryHandler(handle_menu_callback, pattern="^menu_"))
@@ -127,7 +125,7 @@ def main():
     # Redeem text
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_redeem_text))
 
-    # General messages (global check)
+    # General messages (global check + echo)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo_command))
 
     # Background job setup
@@ -136,7 +134,6 @@ def main():
 
     logger.info("Bot started...")
     app.run_polling(allowed_updates=["message", "callback_query"])
-
 
 # ========================
 # ENTRY POINT
