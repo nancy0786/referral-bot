@@ -149,3 +149,33 @@ app.add_handler(CommandHandler("setplan", admin.setplan))
 app.add_handler(CommandHandler("stats", admin.stats))
 app.add_handler(CommandHandler("listusers", admin.listusers))
 
+
+
+# main.py
+import logging
+from telegram.ext import Application, CommandHandler
+import config
+from handlers.start import start
+from handlers.force_join import handle_recheck_join, RECHECK_BTN_DATA
+from handlers.admin_restore import restore_db_command
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+def main():
+    if not config.BOT_TOKEN:
+        raise SystemExit("BOT_TOKEN missing")
+    app = Application.builder().token(config.BOT_TOKEN).build()
+
+    # Basic handlers (register other handlers as you have them)
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("restore_db", restore_db_command))  # admin-only
+
+    # your other handlers...
+    # app.add_handler(CallbackQueryHandler(...))
+
+    logger.info("Bot starting...")
+    app.run_polling(allowed_updates=["message","callback_query"])
+
+if __name__ == "__main__":
+    main()
