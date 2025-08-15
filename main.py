@@ -131,7 +131,13 @@ def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo_command))
 
     # Background jobs
-    app.job_queue.run_repeating(session.check_sessions, interval=60, first=60)
+    app = Application.builder().token(BOT_TOKEN).build()
+
+    # Get the job queue after building
+    job_queue = app.job_queue
+
+    # Add your repeating job
+    job_queue.run_repeating(session.check_sessions, interval=60, first=60)
 
     logger.info("Bot started...")
     app.run_polling(allowed_updates=["message", "callback_query"])
