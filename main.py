@@ -9,7 +9,7 @@ from telegram.ext import (
     CallbackQueryHandler,
     MessageHandler,
     filters,
-    CallbackContext
+    ContextTypes
 )
 
 # ========================
@@ -60,25 +60,25 @@ logger = logging.getLogger(__name__)
 # ========================
 # MIDDLEWARES
 # ========================
-async def activity_middleware(update: Update, context: CallbackContext):
+async def activity_middleware(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user:
         update_last_active(update.effective_user.id)
 
-async def global_user_check(update: Update, context: CallbackContext):
+async def global_user_check(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user:
         user_id = str(update.effective_user.id)
-        await ensure_user_registered(user_id, update.effective_user)
+        await ensure_user_registered(user_id, update.effective_user)  # async
         check_and_update_expiry(user_id)
         refill_free_plan_credits(user_id)
 
 # ========================
 # BASIC COMMANDS
 # ========================
-async def start_command(update: Update, context: CallbackContext):
+async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await global_user_check(update, context)
     await update.message.reply_text("👋 Welcome back! Your plan details are up-to-date.")
 
-async def echo_command(update: Update, context: CallbackContext):
+async def echo_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await global_user_check(update, context)
     await update.message.reply_text("✅ Message received and plan checked.")
 
