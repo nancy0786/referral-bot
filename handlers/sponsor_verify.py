@@ -1,3 +1,5 @@
+# handlers/sponsor_verify.py
+
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
 import config
@@ -6,14 +8,18 @@ from utils.db import get_user, save_user
 VERIFY_AWAIT_KEY = "awaiting_sponsor_verify"
 
 async def ask_sponsor_verification(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Ask user to verify automatically via sponsor bot."""
+    """
+    Ask user to verify automatically via Sponsor Bot.
+    Shows a button linking to the Sponsor Bot.
+    """
     # Set flag for user_data (optional for tracking)
     context.user_data[VERIFY_AWAIT_KEY] = True
 
-    # Message with inline button to sponsor bot
+    # Inline button to open Sponsor Bot
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("🔗 Verify with Sponsor Bot", url=f"https://t.me/{config.SPONSOR_BOT_USERNAME.lstrip('@')}")]
     ])
+
     msg = (
         f"📢 **Sponsor Verification Required**\n\n"
         f"Click the button below to verify with our sponsor bot {config.SPONSOR_BOT_USERNAME}.\n\n"
@@ -23,27 +29,30 @@ async def ask_sponsor_verification(update: Update, context: ContextTypes.DEFAULT
 
 async def auto_verify_sponsor(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     """
-    Automatically verify user from Sponsor Bot.
-    Requires Sponsor Bot API or shared channel mechanism.
-    Returns True if verified.
+    Automatically verify user via Sponsor Bot.
+    Returns True if verified, False otherwise.
+    (Replace the placeholder logic with your Sponsor Bot API or shared mechanism.)
     """
     user_id = update.effective_user.id
-
-    # ---- Replace this block with actual Sponsor Bot verification logic ----
     sponsor_verified = False
+
+    # -------------------------
+    # Placeholder for actual Sponsor Bot verification
+    # -------------------------
     try:
-        # Example: check sponsor DB, channel membership, or API
+        # Example: call Sponsor Bot API, check DB, or shared channel messages
         # sponsor_verified = check_sponsor_api(user_id)
         pass
     except Exception:
         sponsor_verified = False
 
     if sponsor_verified:
+        # Update user profile
         profile = await get_user(user_id)
         profile["sponsor_verified"] = True
         await save_user(user_id, profile)
 
-        # Amazing verification message
+        # Send amazing verification message
         msg = (
             "🎉 **Congratulations!**\n\n"
             "You have been successfully **verified by our Sponsor Bot**.\n"
