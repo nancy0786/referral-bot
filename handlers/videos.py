@@ -119,3 +119,8 @@ async def handle_download_video(update: Update, context: ContextTypes.DEFAULT_TY
     # Send video file
     await query.message.reply_video(video_file_id, caption=f"⬇️ Download Video {vid_num}")
     await query.answer("🎉 Video sent for download!")
+
+
+    # Alias functions for main.py imports
+    video_menu = send_video_menu
+    handle_watch_video = handle_video_number
