@@ -12,9 +12,7 @@ from utils.db import (
     get_user,
     save_user,
     set_invited_by,
-    add_pending_referral,
-    get_user_data,
-    save_user_data
+    add_pending_referral
 )
 
 # Constants
@@ -85,18 +83,18 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
             # Referral credit and badge logic
             if ref_id != user_id:
-                ref_data = get_user_data(ref_id)
-                if user_id not in ref_data.get("referrals", []):
-                    ref_data.setdefault("referrals", []).append(user_id)
-                    ref_data["credits"] = ref_data.get("credits", 0) + REFERRAL_CREDIT
+                ref_profile = await get_user(ref_id)
+                if user_id not in ref_profile.get("referrals", {}).get("pending", []):
+                    ref_profile.setdefault("referrals", {}).setdefault("pending", []).append(user_id)
+                    ref_profile["credits"] = ref_profile.get("credits", 0) + REFERRAL_CREDIT
 
-                    total_refs = len(ref_data["referrals"])
+                    total_refs = len(ref_profile["referrals"].get("pending", []))
                     if total_refs in BADGE_LEVELS:
                         badge = BADGE_LEVELS[total_refs]
-                        if badge not in ref_data.get("badges", []):
-                            ref_data.setdefault("badges", []).append(badge)
+                        if badge not in ref_profile.get("badges", []):
+                            ref_profile.setdefault("badges", []).append(badge)
 
-                    save_user_data(ref_id, ref_data)
+                    await save_user(ref_id, ref_profile)
 
     # --------------------------------------------------------
     # Force Join Check
@@ -110,7 +108,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     # Sponsor Verification Check
     # --------------------------------------------------------
     if not profile.get("sponsor_verified", False):
-        verified = await check_sponsor_message(user_id, context)
+        verified = await auto_verify_sponsor(user_id, context)
         if verified:
             profile["sponsor_verified"] = True
             await save_user(user_id, profile)
@@ -118,6 +116,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             await ask_sponsor_verification(update, context)
             await log_new_user(context, user, ref_code)
             return
+
     # --------------------------------------------------------
     # Save profile to DB and backup channel
     # --------------------------------------------------------
