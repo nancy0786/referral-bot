@@ -8,7 +8,7 @@ import time
 # -----------------------------
 # Config
 # -----------------------------
-VIDEO_CHANNEL = "@YourVideoChannel"
+VIDEO_CHANNEL = -1002524650614
 DB_PATH = "videos.db"
 
 # -----------------------------
