@@ -169,7 +169,7 @@ async def get_video_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_video(video_file_id, caption=f"🎥 Video {vid_num}")
 
 # -----------------------------
-# NEW: List available videos (/videolist)
+# Admin: List available videos (/videolist)
 # -----------------------------
 async def videolist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     videos = get_all_videos(limit=50)  # show first 50 numbers
@@ -179,6 +179,19 @@ async def videolist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     video_list = ", ".join(videos)
     await update.message.reply_text(f"🎥 Available videos:\n{video_list}")
+
+# -----------------------------
+# User: Video details (/videodetails)
+# -----------------------------
+async def videodetails_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show users the list of videos available in DB (like videolist but for all users)."""
+    videos = get_all_videos(limit=50)
+    if not videos:
+        await update.message.reply_text("📂 No videos available. Please wait until admin uploads/fetches videos.")
+        return
+
+    video_list = "\n".join([f"📹 #{v}" for v in videos])
+    await update.message.reply_text(f"🎥 Available Videos:\n{video_list}\n\nUse /video <number> to watch.")
 
 # -----------------------------
 # Existing logic (unchanged but now uses DB)
