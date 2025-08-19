@@ -70,6 +70,20 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     # --------------------------------------------------------
     # Handle referral from /start <ref_id>
+    # -------------------------------------------------------
+      --------------------------------------------------------------------
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = update.effective_user
+    user_id = user.id
+    username = user.username
+    ref_code = None
+
+    # Load or create user profile
+    profile = await get_user(user_id, username=username)
+
+    # --------------------------------------------------------
+    # Handle referral from /start <ref_id>
     # --------------------------------------------------------
     if context.args:
         ref = context.args[0]
@@ -78,23 +92,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             ref_code = ref
             # New referral linking
             if ref_id != user_id and profile["referrals"].get("invited_by") is None:
+                # just mark who invited, and add to pending list
                 await set_invited_by(user_id, ref_id)
                 await add_pending_referral(ref_id, user_id)
-
-            # Referral credit and badge logic
-            if ref_id != user_id:
-                ref_profile = await get_user(ref_id)
-                if user_id not in ref_profile.get("referrals", {}).get("pending", []):
-                    ref_profile.setdefault("referrals", {}).setdefault("pending", []).append(user_id)
-                    ref_profile["credits"] = ref_profile.get("credits", 0) + REFERRAL_CREDIT
-
-                    total_refs = len(ref_profile["referrals"].get("pending", []))
-                    if total_refs in BADGE_LEVELS:
-                        badge = BADGE_LEVELS[total_refs]
-                        if badge not in ref_profile.get("badges", []):
-                            ref_profile.setdefault("badges", []).append(badge)
-
-                    await save_user(ref_id, ref_profile)
+                # ⚠️ Do NOT give credits here, will be done after sponsor verification
 
     # --------------------------------------------------------
     # Force Join Check
@@ -112,6 +113,29 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if verified:
             profile["sponsor_verified"] = True
             await save_user(user_id, profile)
+
+            # ✅ Now give referral credit to referrer
+            if profile["referrals"].get("invited_by"):
+                ref_id = profile["referrals"]["invited_by"]
+                ref_profile = await get_user(ref_id)
+
+                if user_id in ref_profile.get("referrals", {}).get("pending", []):
+                    # remove from pending, count as completed
+                    ref_profile["referrals"]["pending"].remove(user_id)
+                    ref_profile.setdefault("referrals", {}).setdefault("completed", []).append(user_id)
+
+                    # Add credits
+                    ref_profile["credits"] = ref_profile.get("credits", 0) + REFERRAL_CREDIT
+
+                    # Badge system
+                    total_refs = len(ref_profile["referrals"].get("completed", []))
+                    if total_refs in BADGE_LEVELS:
+                        badge = BADGE_LEVELS[total_refs]
+                        if badge not in ref_profile.get("badges", []):
+                            ref_profile.setdefault("badges", []).append(badge)
+
+                    await save_user(ref_id, ref_profile)
+
         else:
             await ask_sponsor_verification(update, context)
             await log_new_user(context, user, ref_code)
