@@ -1,5 +1,6 @@
 # db.py
 import os
+import time
 import json
 import aiofiles
 import asyncio
@@ -124,7 +125,7 @@ async def add_pending_referral(inviter_id: int, referred_user_id: int) -> None:
 async def update_last_active(user_id: int) -> None:
     """Update last active timestamp"""
     user = await get_user(user_id)
-    user["last_active"] = int(os.time())
+    user["last_active"] = int(time.time())
     await save_user(user_id, user)
 
 
