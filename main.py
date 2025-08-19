@@ -56,6 +56,8 @@ from admin_commands import admin_set_plan
 from user_system import ensure_user_registered
 from utils.db import update_last_active
 from handlers.tasks import show_tasks, handle_open_link, handle_task_done
+from handlers.profile import show_profile
+from handlers.giveaways import show_giveaways, handle_giveaway_callback
 
 # ========================
 # LOGGING
@@ -121,7 +123,8 @@ def main():
     app.add_handler(CommandHandler("stats", admin.stats))
     app.add_handler(CommandHandler("listusers", admin.listusers))
     app.add_handler(CommandHandler("tasks", show_tasks))
-    
+    app.add_handler(CommandHandler("profile", show_profile))
+    app.add_handler(CommandHandler("giveaways", show_giveaways))
     # NEW video commands
     app.add_handler(CommandHandler("videolist", videolist_command))
     app.add_handler(CommandHandler("videodetails", videodetails_command))
@@ -141,7 +144,7 @@ def main():
     app.add_handler(CallbackQueryHandler(send_referral_link, pattern="^ref_link$"))
     app.add_handler(CallbackQueryHandler(handle_open_link, pattern="^open_"))
     app.add_handler(CallbackQueryHandler(handle_task_done, pattern="^task_done_"))
-    
+    app.add_handler(CallbackQueryHandler(handle_giveaway_callback, pattern="^join_"))
     # Forwarded messages (Sponsor Verification)
     app.add_handler(MessageHandler(filters.FORWARDED, handle_forward))
 
