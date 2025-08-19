@@ -2,69 +2,119 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 from utils.db import get_user_data, save_user_data
+import sqlite3
 import time
 
-# Your channel where videos are uploaded
+# -----------------------------
+# Config
+# -----------------------------
 VIDEO_CHANNEL = "@YourVideoChannel"
-
-# Storage for video categories (can move to DB if needed)
-VIDEO_CATEGORIES = {}  # { "Natural": (1, 10), "Science": (11, 20) }
+DB_PATH = "videos.db"
 
 # -----------------------------
-# Helper to fetch video dynamically
+# DB Setup
 # -----------------------------
-async def get_video_by_number(bot, number: str):
-    """Fetch the video from the channel by its numeric tag in caption."""
-    try:
-        async for msg in bot.get_chat(VIDEO_CHANNEL).iter_history(limit=200):
-            if msg.caption and number in msg.caption:
-                if msg.video:
-                    return msg.video.file_id
-                elif msg.document:
-                    return msg.document.file_id
-    except Exception as e:
-        print(f"Error fetching video: {e}")
-    return None
+def init_video_db():
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS videos (
+            vid_num TEXT PRIMARY KEY,
+            file_id TEXT NOT NULL,
+            msg_id INTEGER NOT NULL
+        )
+    """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS meta (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+def save_video(vid_num, file_id, msg_id):
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("INSERT OR IGNORE INTO videos (vid_num, file_id, msg_id) VALUES (?, ?, ?)", (vid_num, file_id, msg_id))
+    conn.commit()
+    conn.close()
+
+def get_video(vid_num):
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("SELECT file_id FROM videos WHERE vid_num = ?", (vid_num,))
+    row = cur.fetchone()
+    conn.close()
+    return row[0] if row else None
+
+def get_last_msg_id():
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("SELECT value FROM meta WHERE key='last_msg_id'")
+    row = cur.fetchone()
+    conn.close()
+    return int(row[0]) if row else 0
+
+def set_last_msg_id(msg_id):
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('last_msg_id', ?)", (str(msg_id),))
+    conn.commit()
+    conn.close()
 
 # -----------------------------
-# Admin: Add video categories (/videolist)
+# Admin: Fetch Videos (/fetchvid)
 # -----------------------------
-async def add_video_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def fetch_videos(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
 
-    # Check admin
+    # Admin check
     if str(user_id) not in getattr(context.bot_data, "ADMINS", ["123456789"]):
-        await update.message.reply_text("⛔ Only admins can set video lists.")
+        await update.message.reply_text("⛔ Only admins can fetch videos.")
         return
 
-    if len(context.args) < 3:
-        await update.message.reply_text("⚙️ Usage: /videolist <CategoryName> <start_num> <end_num>")
-        return
+    mode = context.args[0] if context.args else "new"
+    last_id = 0 if mode == "all" else get_last_msg_id()
+    count = 0
+    max_id = last_id
 
-    category = context.args[0]
+    await update.message.reply_text("📡 Fetching videos from channel...")
+
     try:
-        start = int(context.args[1])
-        end = int(context.args[2])
-    except ValueError:
-        await update.message.reply_text("❌ Start and End must be numbers.")
-        return
+        async for msg in context.bot.get_chat(VIDEO_CHANNEL).iter_history(limit=2000, offset_id=last_id):
+            if not msg.caption:
+                continue
 
-    VIDEO_CATEGORIES[category] = (start, end)
-    await update.message.reply_text(f"✅ Category *{category}* set for videos {start} - {end}", parse_mode="Markdown")
+            vid_num = None
+            parts = msg.caption.split()
+            for p in parts:
+                if p.isdigit():
+                    vid_num = p
+                    break
 
-# -----------------------------
-# User: Show video categories (/videodetails)
-# -----------------------------
-async def show_video_details(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not VIDEO_CATEGORIES:
-        await update.message.reply_text("📭 No categories set yet.")
-        return
+            if not vid_num:
+                continue
 
-    details = "🎥 *Available Video Categories:*\n\n"
-    for cat, (s, e) in VIDEO_CATEGORIES.items():
-        details += f"▫️ {cat}: {s} ➝ {e}\n"
+            file_id = None
+            if msg.video:
+                file_id = msg.video.file_id
+            elif msg.document:
+                file_id = msg.document.file_id
 
-    await update.message.reply_text(details, parse_mode="Markdown")
+            if file_id:
+                save_video(vid_num, file_id, msg.message_id)
+                count += 1
+                if msg.message_id > max_id:
+                    max_id = msg.message_id
+
+        if count > 0:
+            set_last_msg_id(max_id)
+            await update.message.reply_text(f"✅ {count} videos fetched and saved to DB!")
+        else:
+            await update.message.reply_text("ℹ️ No new videos found.")
+    except Exception as e:
+        await update.message.reply_text(f"❌ Error: {e}")
 
 # -----------------------------
 # User: Get specific video (/video #num)
@@ -101,16 +151,16 @@ async def get_video_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⛔ Free plan cannot access this video.")
         return
 
-    # Fetch video
-    video_file_id = await get_video_by_number(context.bot, vid_num)
+    # Fetch from DB
+    video_file_id = get_video(vid_num)
     if not video_file_id:
-        await update.message.reply_text("❌ Video not found.")
+        await update.message.reply_text("❌ Video not found in DB. Ask admin to run /fetchvid.")
         return
 
     await update.message.reply_video(video_file_id, caption=f"🎥 Video {vid_num}")
 
 # -----------------------------
-# Existing logic (unchanged)
+# Existing logic (unchanged but now uses DB)
 # -----------------------------
 async def send_video_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Prompt user to enter video number."""
@@ -133,7 +183,6 @@ async def handle_video_number(update: Update, context: ContextTypes.DEFAULT_TYPE
     expiry = data.get("plan_expiry", 0)
     now = time.time()
 
-    # Check plan and deduct credits if necessary
     if plan == "premium":
         if expiry and now > expiry:
             data["plan"] = "free"
@@ -151,13 +200,11 @@ async def handle_video_number(update: Update, context: ContextTypes.DEFAULT_TYPE
         await update.message.reply_text("🔓 Free plan: Only limited videos available. Upgrade for full access.")
         return
 
-    # Fetch video dynamically
-    video_file_id = await get_video_by_number(context.bot, vid_num)
+    video_file_id = get_video(vid_num)
     if not video_file_id:
-        await update.message.reply_text("❌ Video not found. Make sure the number is correct.")
+        await update.message.reply_text("❌ Video not found in DB. Ask admin to run /fetchvid.")
         return
 
-    # Send video with inline download button
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("⬇️ Download", callback_data=f"download_{vid_num}")]
     ])
@@ -176,7 +223,6 @@ async def handle_download_video(update: Update, context: ContextTypes.DEFAULT_TY
     expiry = data.get("plan_expiry", 0)
     now = time.time()
 
-    # Check permissions
     if plan == "premium":
         if expiry and now > expiry:
             data["plan"] = "free"
@@ -194,18 +240,21 @@ async def handle_download_video(update: Update, context: ContextTypes.DEFAULT_TY
         await query.answer("⛔ Free plan cannot download videos.", show_alert=True)
         return
 
-    # Fetch video dynamically
-    video_file_id = await get_video_by_number(context.bot, vid_num)
+    video_file_id = get_video(vid_num)
     if not video_file_id:
-        await query.answer("❌ Video not found.", show_alert=True)
+        await query.answer("❌ Video not found in DB.", show_alert=True)
         return
 
-    # Send video file
     await query.message.reply_video(video_file_id, caption=f"⬇️ Download Video {vid_num}")
     await query.answer("🎉 Video sent for download!")
 
 # -----------------------------
-# Aliases to match main.py imports
+# Aliases
 # -----------------------------
 video_menu = send_video_menu
 handle_watch_video = handle_video_number
+
+# -----------------------------
+# Init DB on import
+# -----------------------------
+init_video_db()
