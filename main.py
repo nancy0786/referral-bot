@@ -43,7 +43,7 @@ from handlers.videos import (
     videolist_command,
     videodetails_command,
     get_video_command,
-    fetch_videos_command   # ✅ NEW
+    fetch_videos   # ✅ NEW
 )
 from handlers.tasks import show_tasks, handle_task_done
 from handlers.profile import show_profile
