@@ -71,8 +71,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     # --------------------------------------------------------
     # Handle referral from /start <ref_id>
     # -------------------------------------------------------
-      --------------------------------------------------------------------
-
+      
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     user_id = user.id
