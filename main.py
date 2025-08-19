@@ -143,7 +143,7 @@ def main():
     app.add_handler(CallbackQueryHandler(show_tasks, pattern="^tasks$"))
     app.add_handler(CallbackQueryHandler(handle_task_done, pattern="^task_done_"))
     app.add_handler(CallbackQueryHandler(show_profile, pattern="^profile$"))
-    app.add_handler(CallbackQueryHandler(send_referral_link, pattern="^ref_link$"))
+    app.add_handler(CallbackQueryHandler(referral_command, pattern="^ref_link$"))
     app.add_handler(CallbackQueryHandler(handle_open_link, pattern="^open_"))
     app.add_handler(CallbackQueryHandler(handle_task_done, pattern="^task_done_"))
     app.add_handler(CallbackQueryHandler(handle_giveaway_callback, pattern="^join_"))
