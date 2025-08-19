@@ -47,7 +47,6 @@ from handlers.videos import (
 )
 from handlers.tasks import show_tasks, handle_task_done
 from handlers.profile import show_profile
-from handlers.referral import send_referral_link
 from handlers.redeem import start_redeem_command, start_redeem_from_menu, handle_redeem_text
 from handlers import admin, session
 from handlers.admin_restore import restore_db_command
