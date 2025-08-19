@@ -48,6 +48,15 @@ def get_video(vid_num):
     conn.close()
     return row[0] if row else None
 
+def get_all_videos(limit=20):
+    """Return list of all video numbers saved in DB"""
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("SELECT vid_num FROM videos ORDER BY CAST(vid_num AS INTEGER) ASC LIMIT ?", (limit,))
+    rows = cur.fetchall()
+    conn.close()
+    return [r[0] for r in rows]
+
 def get_last_msg_id():
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
@@ -158,6 +167,18 @@ async def get_video_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     await update.message.reply_video(video_file_id, caption=f"🎥 Video {vid_num}")
+
+# -----------------------------
+# NEW: List available videos (/videolist)
+# -----------------------------
+async def videolist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    videos = get_all_videos(limit=50)  # show first 50 numbers
+    if not videos:
+        await update.message.reply_text("📂 No videos found in database. Admin must run /fetchvid first.")
+        return
+
+    video_list = ", ".join(videos)
+    await update.message.reply_text(f"🎥 Available videos:\n{video_list}")
 
 # -----------------------------
 # Existing logic (unchanged but now uses DB)
