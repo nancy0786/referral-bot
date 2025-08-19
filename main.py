@@ -58,7 +58,7 @@ from utils.db import update_last_active
 from handlers.tasks import show_tasks, handle_open_link, handle_task_done
 from handlers.profile import show_profile
 from handlers.giveaways import show_giveaways, handle_giveaway_callback
-from handlers.referral import send_referral_link
+from handlers.referral import referral_command
 
 # ========================
 # LOGGING
@@ -126,7 +126,7 @@ def main():
     app.add_handler(CommandHandler("tasks", show_tasks))
     app.add_handler(CommandHandler("profile", show_profile))
     app.add_handler(CommandHandler("giveaways", show_giveaways))
-    app.add_handler(CommandHandler("referral", send_referral_link))
+    app.add_handler(CommandHandler("referral", referral_command))
     
     # NEW video commands
     app.add_handler(CommandHandler("videolist", videolist_command))
