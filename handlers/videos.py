@@ -7,6 +7,9 @@ import time
 # Your channel where videos are uploaded
 VIDEO_CHANNEL = "@YourVideoChannel"
 
+# Storage for video categories (can move to DB if needed)
+VIDEO_CATEGORIES = {}  # { "Natural": (1, 10), "Science": (11, 20) }
+
 # -----------------------------
 # Helper to fetch video dynamically
 # -----------------------------
@@ -24,7 +27,90 @@ async def get_video_by_number(bot, number: str):
     return None
 
 # -----------------------------
-# Show video menu to user
+# Admin: Add video categories (/videolist)
+# -----------------------------
+async def add_video_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+
+    # Check admin
+    if str(user_id) not in getattr(context.bot_data, "ADMINS", ["123456789"]):
+        await update.message.reply_text("⛔ Only admins can set video lists.")
+        return
+
+    if len(context.args) < 3:
+        await update.message.reply_text("⚙️ Usage: /videolist <CategoryName> <start_num> <end_num>")
+        return
+
+    category = context.args[0]
+    try:
+        start = int(context.args[1])
+        end = int(context.args[2])
+    except ValueError:
+        await update.message.reply_text("❌ Start and End must be numbers.")
+        return
+
+    VIDEO_CATEGORIES[category] = (start, end)
+    await update.message.reply_text(f"✅ Category *{category}* set for videos {start} - {end}", parse_mode="Markdown")
+
+# -----------------------------
+# User: Show video categories (/videodetails)
+# -----------------------------
+async def show_video_details(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not VIDEO_CATEGORIES:
+        await update.message.reply_text("📭 No categories set yet.")
+        return
+
+    details = "🎥 *Available Video Categories:*\n\n"
+    for cat, (s, e) in VIDEO_CATEGORIES.items():
+        details += f"▫️ {cat}: {s} ➝ {e}\n"
+
+    await update.message.reply_text(details, parse_mode="Markdown")
+
+# -----------------------------
+# User: Get specific video (/video #num)
+# -----------------------------
+async def get_video_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("⚙️ Usage: /video <number>")
+        return
+
+    vid_num = context.args[0].lstrip("#")
+    user_id = update.effective_user.id
+    data = get_user_data(user_id)
+
+    plan = data.get("plan", "free")
+    credits = data.get("credits", 0)
+    expiry = data.get("plan_expiry", 0)
+    now = time.time()
+
+    # Check access
+    if plan == "premium":
+        if expiry and now > expiry:
+            data["plan"] = "free"
+            save_user_data(user_id, data)
+            await update.message.reply_text("⚠️ Premium expired. Upgrade required.")
+            return
+    elif plan == "credit":
+        if credits > 0:
+            data["credits"] -= 1
+            save_user_data(user_id, data)
+        else:
+            await update.message.reply_text("💳 Not enough credits.")
+            return
+    elif plan == "free":
+        await update.message.reply_text("⛔ Free plan cannot access this video.")
+        return
+
+    # Fetch video
+    video_file_id = await get_video_by_number(context.bot, vid_num)
+    if not video_file_id:
+        await update.message.reply_text("❌ Video not found.")
+        return
+
+    await update.message.reply_video(video_file_id, caption=f"🎥 Video {vid_num}")
+
+# -----------------------------
+# Existing logic (unchanged)
 # -----------------------------
 async def send_video_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Prompt user to enter video number."""
@@ -33,9 +119,6 @@ async def send_video_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     context.user_data["awaiting_video_number"] = True
 
-# -----------------------------
-# Handle user input for video
-# -----------------------------
 async def handle_video_number(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handles user input for video number."""
     if not context.user_data.get("awaiting_video_number"):
@@ -81,9 +164,6 @@ async def handle_video_number(update: Update, context: ContextTypes.DEFAULT_TYPE
     await update.message.reply_video(video_file_id, caption=f"🎥 Video {vid_num}", reply_markup=keyboard)
     context.user_data["awaiting_video_number"] = False
 
-# -----------------------------
-# Handle download request
-# -----------------------------
 async def handle_download_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle download request with plan/credits check."""
     query = update.callback_query
