@@ -42,7 +42,8 @@ from handlers.videos import (
     handle_download_video,
     videolist_command,
     videodetails_command,
-    video_command
+    video_command,
+    fetch_videos_command   # ✅ NEW
 )
 from handlers.tasks import show_tasks, handle_task_done
 from handlers.profile import show_profile
@@ -123,6 +124,7 @@ def main():
     app.add_handler(CommandHandler("videolist", videolist_command))
     app.add_handler(CommandHandler("videodetails", videodetails_command))
     app.add_handler(CommandHandler("video", video_command))
+    app.add_handler(CommandHandler("fetchvid", fetch_videos_command))  # ✅ NEW admin fetch command
 
     # CallbackQueryHandlers
     app.add_handler(CallbackQueryHandler(handle_recheck_join, pattern=f"^{RECHECK_BTN_DATA}$"))
