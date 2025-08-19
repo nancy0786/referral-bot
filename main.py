@@ -123,8 +123,8 @@ def main():
     # NEW video commands
     app.add_handler(CommandHandler("videolist", videolist_command))
     app.add_handler(CommandHandler("videodetails", videodetails_command))
-    app.add_handler(CommandHandler("video", video_command))
-    app.add_handler(CommandHandler("fetchvid", fetch_videos_command))  # ✅ NEW admin fetch command
+    app.add_handler(CommandHandler("video", get_video_command))
+    app.add_handler(CommandHandler("fetchvid", fetch_videos))  # ✅ NEW admin fetch command
 
     # CallbackQueryHandlers
     app.add_handler(CallbackQueryHandler(handle_recheck_join, pattern=f"^{RECHECK_BTN_DATA}$"))
