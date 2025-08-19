@@ -4,7 +4,7 @@ import json
 import aiofiles
 import asyncio
 import tempfile
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 import config
 from . import backup  # backup.update_user_backup
 
@@ -26,7 +26,14 @@ DEFAULT_USER: Dict[str, Any] = {
     "tasks_completed": [],
     "giveaways_joined": [],
     "last_active": 0,
-    "active_messages": []
+    "active_messages": [],
+
+    # 🆕 Section for video details
+    "videos": {
+        "fetched": [],   # video IDs fetched from database channel
+        "watched": [],   # video IDs user already watched
+        "tags": {}       # mapping: {video_id: ["tag1", "tag2"]}
+    }
 }
 
 def _path_for(user_id: int) -> str:
@@ -53,6 +60,10 @@ async def get_user(user_id: int, username: Optional[str] = None) -> Dict[str, An
             data = dict(DEFAULT_USER)
             data["user_id"] = user_id
             data["username"] = username
+
+    # Ensure new fields exist for old users
+    if "videos" not in data:
+        data["videos"] = {"fetched": [], "watched": [], "tags": {}}
 
     if username:
         data["username"] = username
@@ -130,6 +141,33 @@ async def clear_active_messages(user_id: int) -> None:
     user = await get_user(user_id)
     user["active_messages"] = []
     await save_user(user_id, user)
+
+
+
+# 🆕 ---------------- VIDEO MANAGEMENT ----------------
+
+async def add_fetched_video(user_id: int, video_id: int, tags: Optional[List[str]] = None):
+    """Add a fetched video with optional tags"""
+    user = await get_user(user_id)
+    if video_id not in user["videos"]["fetched"]:
+        user["videos"]["fetched"].append(video_id)
+    if tags:
+        user["videos"]["tags"][str(video_id)] = tags
+    await save_user(user_id, user)
+
+
+async def mark_video_watched(user_id: int, video_id: int):
+    """Mark video as watched"""
+    user = await get_user(user_id)
+    if video_id not in user["videos"]["watched"]:
+        user["videos"]["watched"].append(video_id)
+    await save_user(user_id, user)
+
+
+async def get_user_videos(user_id: int):
+    """Return all video info for user"""
+    user = await get_user(user_id)
+    return user.get("videos", {"fetched": [], "watched": [], "tags": {}})
 
 
 
