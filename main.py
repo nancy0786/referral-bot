@@ -2,7 +2,7 @@
 import os
 import logging
 from dotenv import load_dotenv
-from telegram import InlineKeyboardButton, Update
+from telegram import Update
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -36,7 +36,14 @@ from handlers.start import start
 from handlers.force_join import handle_recheck_join, RECHECK_BTN_DATA
 from handlers.sponsor_verify import handle_forward
 from handlers.menu import send_main_menu, handle_menu_callback
-from handlers.videos import video_menu, handle_watch_video, handle_download_video
+from handlers.videos import (
+    video_menu,
+    handle_watch_video,
+    handle_download_video,
+    videolist_command,
+    videodetails_command,
+    video_command
+)
 from handlers.tasks import show_tasks, handle_task_done
 from handlers.profile import show_profile
 from handlers.referral import send_referral_link
@@ -62,18 +69,17 @@ logger = logging.getLogger(__name__)
 # ========================
 async def activity_middleware(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user:
-        # Await the async DB function
-        await update_last_active(update.effective_user.id)  # <-- fixed
+        await update_last_active(update.effective_user.id)
 
 async def global_user_check(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user:
         user_id = str(update.effective_user.id)
-        # Only await if ensure_user_registered is async, else call normally
         result = ensure_user_registered(user_id, update.effective_user)
-        if result:  # If async returns coroutine, await it
+        if result:
             await result
         check_and_update_expiry(user_id)
         refill_free_plan_credits(user_id)
+
 # ========================
 # BASIC COMMANDS
 # ========================
@@ -94,6 +100,9 @@ def main():
 
     app = Application.builder().token(BOT_TOKEN).build()
 
+    # Save admin IDs in bot_data for use in videolist
+    app.bot_data["ADMIN_IDS"] = ADMIN_IDS
+
     # Middleware
     app.add_handler(MessageHandler(filters.ALL, activity_middleware), group=-1)
 
@@ -109,6 +118,11 @@ def main():
     app.add_handler(CommandHandler("setplan", admin.setplan))
     app.add_handler(CommandHandler("stats", admin.stats))
     app.add_handler(CommandHandler("listusers", admin.listusers))
+
+    # NEW video commands
+    app.add_handler(CommandHandler("videolist", videolist_command))
+    app.add_handler(CommandHandler("videodetails", videodetails_command))
+    app.add_handler(CommandHandler("video", video_command))
 
     # CallbackQueryHandlers
     app.add_handler(CallbackQueryHandler(handle_recheck_join, pattern=f"^{RECHECK_BTN_DATA}$"))
@@ -128,10 +142,10 @@ def main():
     # Redeem text
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_redeem_text))
 
-    # General messages (global check + echo)
+    # General messages
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo_command))
 
-    # Background job setup
+    # Background jobs
     job_queue = app.job_queue
     job_queue.run_repeating(session.check_sessions, interval=60, first=60)
 
