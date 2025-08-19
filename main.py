@@ -42,7 +42,7 @@ from handlers.videos import (
     handle_download_video,
     videolist_command,
     videodetails_command,
-    video_command,
+    get_video_command,
     fetch_videos_command   # ✅ NEW
 )
 from handlers.tasks import show_tasks, handle_task_done
