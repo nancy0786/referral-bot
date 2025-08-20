@@ -11,12 +11,12 @@ async def show_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     name = user_data.get("name") or update.effective_user.first_name
     username = f"@{update.effective_user.username}" if update.effective_user.username else "N/A"
     plan = user_data.get("plan", "free").capitalize()
-    credits = user_data.get("credits", 0)
+    credits = user_data.get("credits", 0)   # ✅ includes tasks, rewards, giveaways, redeem
     expiry = user_data.get("plan_expiry", "N/A")
     verified = "✅ Verified" if user_data.get("sponsor_verified", False) else "❌ Not Verified"
 
-    # Tasks & rewards
-    tasks_done = len(user_data.get("tasks_completed", []))
+    # Progress
+    tasks_done = len(user_data.get("tasks_completed", []))  # ✅ only direct task completions
     badges = ", ".join(user_data.get("badges", [])) or "None"
 
     # Referral
@@ -29,7 +29,7 @@ async def show_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"• Username: {username}\n"
         f"• Telegram ID: `{user_id}`\n"
         f"• Plan: {plan}\n"
-        f"• Credits: {credits}\n"
+        f"• Credits (All Sources): {credits}\n"   # ✅ shows total credits
         f"• Plan Expiry: {expiry}\n"
         f"• Sponsor Status: {verified}\n\n"
         f"📋 **Progress**\n"
