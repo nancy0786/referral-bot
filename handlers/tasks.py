@@ -3,7 +3,13 @@ import logging
 import asyncio
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
-from utils.db import get_all_tasks, mark_task_completed, get_user, mark_task_opened, save_user
+from utils.db import (
+    get_all_tasks,
+    get_user,
+    save_user,
+    mark_task_opened,
+    mark_task_completed
+)
 
 logger = logging.getLogger(__name__)
 
@@ -62,10 +68,10 @@ async def handle_open_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Send task link
     await query.message.reply_text(
         f"🔗 Task: {task['title']}\n\n👉 {task['link']}\n\n"
-        "⏳ You can click Done after 5 seconds..."
+        "⏳ Please wait 5 seconds before you can click Done..."
     )
 
-    # Wait 5s before enabling Done
+    # Wait 5 seconds before enabling Done
     await asyncio.sleep(5)
     await query.message.reply_text(
         f"✅ Now you can mark *{task['title']}* as Done.",
@@ -104,10 +110,11 @@ async def handle_task_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Mark task as completed
     await mark_task_completed(user_id, str(task["id"]))
 
-    # Add credits
+    # Add credits to user & save
     user["credits"] += task["reward"]
     await save_user(user_id, user)
 
+    # Notify user
     await context.application.bot.send_message(
         chat_id=user_id,
         text=f"🎉 Task *{task['title']}* completed! +{task['reward']} credits",
