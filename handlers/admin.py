@@ -5,7 +5,13 @@ import time
 import json
 from telegram import Update
 from telegram.ext import ContextTypes
-from utils.db import get_user, save_user, add_task, get_tasks, delete_task
+from utils.db import (
+    get_user,
+    save_user,
+    add_task,
+    get_all_tasks,
+    delete_task
+)
 from utils.config import load_config, save_config
 
 # Replace with your admin IDs
@@ -121,7 +127,7 @@ async def addtask(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.effective_user.id):
         return
     if not context.args:
-        return await update.message.reply_text("Usage: /addtask <json_task>")
+        return await update.message.reply_text("Usage: /addtask {\"title\": \"My Task\", \"link\": \"https://...\", \"reward\": 10}")
 
     try:
         task_json = " ".join(context.args)
@@ -130,7 +136,7 @@ async def addtask(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not all(k in task for k in ("title", "link", "reward")):
             return await update.message.reply_text("❌ Task must include title, link, and reward.")
 
-        add_task(task)
+        await add_task(task)  # ✅ now async
         await update.message.reply_text(f"✅ Task added: {task['title']}")
     except Exception as e:
         await update.message.reply_text(f"❌ Failed to add task: {e}")
@@ -139,7 +145,7 @@ async def addtask(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def viewtasks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.effective_user.id):
         return
-    tasks = get_tasks()
+    tasks = await get_all_tasks()
     if not tasks:
         return await update.message.reply_text("⚠️ No tasks available.")
 
@@ -157,10 +163,10 @@ async def deletetask(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         index = int(context.args[0]) - 1
-        tasks = get_tasks()
+        tasks = await get_all_tasks()
         if 0 <= index < len(tasks):
             removed = tasks[index]
-            delete_task(index)
+            await delete_task(index)
             await update.message.reply_text(f"🗑️ Task removed: {removed['title']}")
         else:
             await update.message.reply_text("❌ Invalid task number.")
