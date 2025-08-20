@@ -284,10 +284,12 @@ async def get_user_data(user_id: int):
         referrals = {"pending": referrals, "completed": [], "invited_by": None, "total": 0, "successful": 0}
 
     return {
+        "user_id": user.get("user_id"),
+        "name": user.get("username"),
         "credits": user.get("credits", 0),
         "plan": user.get("plan", {}).get("name", "Free"),
         "plan_expiry": user.get("plan", {}).get("expires_at"),
-        "referrals": referrals.get("pending", []),
+        "referrals": referrals,
         "badges": user.get("badges", []),
         "redeemed_codes": user.get("redeemed_codes", []),
         "usage_today": user.get("usage", {}).get("videos_watched_today", 0),
@@ -295,7 +297,9 @@ async def get_user_data(user_id: int):
         "sponsor_verified": user.get("sponsor_verified", False),
         "last_active": user.get("last_active", 0),
         "active_messages": user.get("active_messages", []),
-        "ref_link": user.get("ref_link")   # ✅ add this
+        "ref_link": user.get("ref_link"),
+        # 🆕 Add tasks info for profile
+        "tasks_completed": user.get("tasks_completed", []),
     }
 
 
@@ -310,7 +314,7 @@ async def save_user_data(user_id: int, data: dict):
     user["credits"] = data.get("credits", user.get("credits", 0))
     user["plan"]["name"] = data.get("plan", user.get("plan", {}).get("name", "Free"))
     user["plan"]["expires_at"] = data.get("plan_expiry", user.get("plan", {}).get("expires_at"))
-    user["referrals"]["pending"] = data.get("referrals", user.get("referrals", {}).get("pending", []))
+    user["referrals"] = data.get("referrals", user.get("referrals", {}))
     user["badges"] = data.get("badges", user.get("badges", []))
     user["redeemed_codes"] = data.get("redeemed_codes", user.get("redeemed_codes", []))
     user["usage"]["videos_watched_today"] = data.get("usage_today", user.get("usage", {}).get("videos_watched_today", 0))
@@ -318,5 +322,6 @@ async def save_user_data(user_id: int, data: dict):
     user["sponsor_verified"] = data.get("sponsor_verified", user.get("sponsor_verified", False))
     user["last_active"] = data.get("last_active", user.get("last_active", 0))
     user["active_messages"] = data.get("active_messages", user.get("active_messages", []))
+    user["tasks_completed"] = data.get("tasks_completed", user.get("tasks_completed", []))
 
     await save_user(user_id, user)
