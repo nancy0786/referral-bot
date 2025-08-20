@@ -5,9 +5,8 @@ import time
 import json
 from telegram import Update
 from telegram.ext import ContextTypes
-from utils.db import get_user, save_user
+from utils.db import get_user, save_user, add_task, get_tasks, delete_task
 from utils.config import load_config, save_config
-from handlers.tasks import TASKS  # Import the task list
 
 # Replace with your admin IDs
 ADMIN_IDS = [int(x) for x in os.getenv("ADMIN_IDS", "").split(",") if x.strip()]
@@ -127,7 +126,11 @@ async def addtask(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         task_json = " ".join(context.args)
         task = json.loads(task_json)
-        TASKS.append(task)
+
+        if not all(k in task for k in ("title", "link", "reward")):
+            return await update.message.reply_text("❌ Task must include title, link, and reward.")
+
+        add_task(task)
         await update.message.reply_text(f"✅ Task added: {task['title']}")
     except Exception as e:
         await update.message.reply_text(f"❌ Failed to add task: {e}")
@@ -136,11 +139,12 @@ async def addtask(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def viewtasks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.effective_user.id):
         return
-    if not TASKS:
+    tasks = get_tasks()
+    if not tasks:
         return await update.message.reply_text("⚠️ No tasks available.")
 
     message = "📋 Current Tasks:\n\n"
-    for i, task in enumerate(TASKS, start=1):
+    for i, task in enumerate(tasks, start=1):
         message += f"{i}. {task['title']} (Reward: {task['reward']})\n"
     await update.message.reply_text(message)
 
@@ -153,8 +157,10 @@ async def deletetask(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         index = int(context.args[0]) - 1
-        if 0 <= index < len(TASKS):
-            removed = TASKS.pop(index)
+        tasks = get_tasks()
+        if 0 <= index < len(tasks):
+            removed = tasks[index]
+            delete_task(index)
             await update.message.reply_text(f"🗑️ Task removed: {removed['title']}")
         else:
             await update.message.reply_text("❌ Invalid task number.")
