@@ -1,102 +1,78 @@
 # handlers/tasks.py
-
-import asyncio
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+import logging
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
-from utils.db import get_user_data, save_user_data
+from utils.db import get_tasks, complete_task, add_user_task_progress
 
-# Example tasks
-TASKS = [
-    {"id": "join_channel", "title": "Join Our Partner Channel", "reward": 2, "type": "telegram_channel", "link": "https://t.me/partner_channel"},
-    {"id": "join_group", "title": "Join Our Support Group", "reward": 2, "type": "telegram_group", "link": "https://t.me/partner_group"},
-    {"id": "follow_instagram", "title": "Follow Instagram", "reward": 1, "type": "external", "link": "https://instagram.com/example"},
-]
+logger = logging.getLogger(__name__)
 
-
-# Build keyboard dynamically
-def build_task_keyboard(user_id):
-    user_data = get_user_data(user_id)
-    completed = user_data.get("tasks_completed", [])
-
-    keyboard = []
-    for task in TASKS:
-        if task["id"] in completed:
-            # Already completed
-            keyboard.append([InlineKeyboardButton(f"✅ {task['title']} (Completed)", callback_data="done")])
-        else:
-            # Show only link initially
-            keyboard.append([InlineKeyboardButton(f"🔗 {task['title']}", callback_data=f"open_{task['id']}")])
-    return InlineKeyboardMarkup(keyboard)
-
-
-# Show tasks
+# ========================
+# USER COMMAND: /tasks
+# ========================
 async def show_tasks(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    markup = build_task_keyboard(user_id)
+    """Show available tasks to the user."""
+    user_id = str(update.effective_user.id)
+    tasks = get_tasks()
 
-    if update.message:
-        await update.message.reply_text("📋 Complete tasks to earn rewards:", reply_markup=markup)
-    else:
-        await update.callback_query.edit_message_text("📋 Complete tasks to earn rewards:", reply_markup=markup)
+    if not tasks:
+        await update.message.reply_text("✅ No active tasks available right now.")
+        return
 
+    buttons = []
+    for idx, task in enumerate(tasks, start=1):
+        buttons.append([
+            InlineKeyboardButton(f"🔗 {task['title']}", callback_data=f"open_{idx}"),
+            InlineKeyboardButton("✅ Done", callback_data=f"task_done_{idx}")
+        ])
 
-# Handle "Open Link" click
+    await update.message.reply_text(
+        "📋 Here are your available tasks:",
+        reply_markup=InlineKeyboardMarkup(buttons)
+    )
+
+# ========================
+# BUTTON HANDLERS
+# ========================
 async def handle_open_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle when user clicks 'open link'."""
     query = update.callback_query
-    user_id = query.from_user.id
-    task_id = query.data.replace("open_", "")
-    task = next((t for t in TASKS if t["id"] == task_id), None)
-
-    if not task:
-        await query.answer("⚠️ Task not found!", show_alert=True)
-        return
-
-    # Send the link
     await query.answer()
-    await query.message.reply_text(f"🔗 Open this task: {task['title']}\n{task['link']}")
 
-    # Wait 3 seconds then show Done button for THIS task
-    await asyncio.sleep(3)
+    idx = int(query.data.split("_")[1])
+    tasks = get_tasks()
 
-    user_data = get_user_data(user_id)
-    completed = user_data.get("tasks_completed", [])
+    if idx <= 0 or idx > len(tasks):
+        await query.edit_message_text("⚠️ Invalid task.")
+        return
 
-    keyboard = []
-    for t in TASKS:
-        if t["id"] in completed:
-            keyboard.append([InlineKeyboardButton(f"✅ {t['title']} (Completed)", callback_data="done")])
-        elif t["id"] == task_id:
-            keyboard.append([InlineKeyboardButton(f"✅ Done (+{t['reward']} credits)", callback_data=f"task_done_{task_id}")])
-        else:
-            keyboard.append([InlineKeyboardButton(f"🔗 {t['title']}", callback_data=f"open_{t['id']}")])
+    task = tasks[idx - 1]
+    await query.edit_message_text(
+        f"🔗 Task: {task['title']}\n\n"
+        f"👉 [Click here to open link]({task['link']})",
+        parse_mode="Markdown",
+        disable_web_page_preview=True
+    )
 
-    await query.message.edit_text("📋 Complete tasks to earn rewards:", reply_markup=InlineKeyboardMarkup(keyboard))
-
-
-# Handle "Done" click
 async def handle_task_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle when user clicks 'Done' button."""
     query = update.callback_query
-    user_id = query.from_user.id
-    task_id = query.data.replace("task_done_", "")
+    await query.answer()
 
-    user_data = get_user_data(user_id)
+    user_id = str(query.from_user.id)
+    idx = int(query.data.split("_")[2])
+    tasks = get_tasks()
 
-    if task_id in user_data.get("tasks_completed", []):
-        await query.answer("✅ You already completed this task!", show_alert=True)
+    if idx <= 0 or idx > len(tasks):
+        await query.edit_message_text("⚠️ Invalid task.")
         return
 
-    task = next((t for t in TASKS if t["id"] == task_id), None)
-    if not task:
-        await query.answer("⚠️ Task not found!", show_alert=True)
-        return
+    task = tasks[idx - 1]
 
-    # Add credits
-    user_data["credits"] += task["reward"]
-    user_data["tasks_completed"].append(task_id)
-    save_user_data(user_id, user_data)
+    # Mark task as complete for this user
+    complete_task(user_id, task["title"])
+    add_user_task_progress(user_id, task["title"])
 
-    await query.answer(f"🎉 Task completed! +{task['reward']} credits", show_alert=True)
-
-    # Refresh keyboard
-    markup = build_task_keyboard(user_id)
-    await query.message.edit_text("📋 Complete tasks to earn rewards:", reply_markup=markup)
+    await query.edit_message_text(
+        f"✅ Task *{task['title']}* marked as completed!",
+        parse_mode="Markdown"
+    )
