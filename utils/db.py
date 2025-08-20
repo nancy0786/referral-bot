@@ -22,6 +22,7 @@ DEFAULT_USER: Dict[str, Any] = {
     "downloads_per_day": 0,
     "usage": {"videos_watched_today": 0, "last_watch_reset": None},
     "referrals": {"invited_by": None, "total": 0, "successful": 0, "pending": []},
+    "ref_link": None,
     "badges": [],
     "sponsor_verified": False,
     "tasks_completed": [],
@@ -194,6 +195,7 @@ async def get_user_data(user_id: int):
         "sponsor_verified": user.get("sponsor_verified", False),
         "last_active": user.get("last_active", 0),
         "active_messages": user.get("active_messages", [])
+        "ref_link": user.get("ref_link")   # ✅ add this
     }
 
 
