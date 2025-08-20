@@ -240,12 +240,38 @@ async def delete_task(index: int):
         await save_all_tasks(tasks)
 
 
-async def mark_task_completed(user_id: int, task_id: str):
-    """Mark task as completed for a user"""
+# 🆕 Track which tasks user opened (to enforce "open before done")
+async def mark_task_opened(user_id: int, task_id: str):
+    """Mark that a user has opened a task link."""
     user = await get_user(user_id)
-    if task_id not in user["tasks_completed"]:
-        user["tasks_completed"].append(task_id)
+    if "tasks_opened" not in user:
+        user["tasks_opened"] = {}
+    user["tasks_opened"][task_id] = int(time.time())  # store open timestamp
     await save_user(user_id, user)
+
+
+async def mark_task_completed(user_id: int, task_id: str, reward: int = 0):
+    """Mark task as completed and credit user if valid."""
+    user = await get_user(user_id)
+
+    # Ensure opened before completion
+    opened_at = user.get("tasks_opened", {}).get(task_id)
+    if not opened_at:
+        return False, "⚠️ You must open the task link first!"
+
+    # Ensure at least 5s passed
+    if time.time() - opened_at < 5:
+        return False, "⏳ Please stay at least 5 seconds before completing."
+
+    # Prevent double credit
+    if task_id in user.get("tasks_completed", []):
+        return False, "✅ You already completed this task!"
+
+    # Mark completed & add credits
+    user["tasks_completed"].append(task_id)
+    user["credits"] = user.get("credits", 0) + reward
+    await save_user(user_id, user)
+    return True, f"🎉 Task completed! +{reward} credits"
 
 # Backward compatibility for older handlers
 async def get_user_data(user_id: int):
