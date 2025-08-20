@@ -194,7 +194,7 @@ async def get_user_data(user_id: int):
         "last_reset": user.get("usage", {}).get("last_watch_reset"),
         "sponsor_verified": user.get("sponsor_verified", False),
         "last_active": user.get("last_active", 0),
-        "active_messages": user.get("active_messages", [])
+        "active_messages": user.get("active_messages", []),
         "ref_link": user.get("ref_link")   # ✅ add this
     }
 
