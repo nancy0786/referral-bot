@@ -23,7 +23,10 @@ async def show_tasks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = await get_user(user_id)
 
     if not tasks:
-        await update.message.reply_text("✅ No active tasks available right now.")
+        if update.message:
+            await update.message.reply_text("✅ No active tasks available right now.")
+        elif update.callback_query:
+            await update.callback_query.edit_message_text("✅ No active tasks available right now.")
         return
 
     buttons = []
@@ -39,10 +42,16 @@ async def show_tasks(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 InlineKeyboardButton(f"✅ Done (+{task['reward']} credits)", callback_data=f"task_done_{idx}")
             ])
 
-    await update.message.reply_text(
-        "📋 Here are your available tasks:",
-        reply_markup=InlineKeyboardMarkup(buttons)
-    )
+    if update.message:
+        await update.message.reply_text(
+            "📋 Here are your available tasks:",
+            reply_markup=InlineKeyboardMarkup(buttons)
+        )
+    elif update.callback_query:
+        await update.callback_query.edit_message_text(
+            "📋 Here are your available tasks:",
+            reply_markup=InlineKeyboardMarkup(buttons)
+        )
 
 # ========================
 # BUTTON HANDLERS
@@ -110,8 +119,8 @@ async def handle_task_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Mark task as completed
     await mark_task_completed(user_id, str(task["id"]))
 
-    # Add credits to user & save
-    user["credits"] += task["reward"]
+    # Add credits safely
+    user["credits"] = user.get("credits", 0) + task["reward"]
     await save_user(user_id, user)
 
     # Notify user
