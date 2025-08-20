@@ -1,16 +1,20 @@
 # handlers/admin.py
+
 import os
 import time
+import json
 from telegram import Update
 from telegram.ext import ContextTypes
 from utils.db import get_user, save_user
 from utils.config import load_config, save_config
+from handlers.tasks import TASKS  # Import the task list
 
 # Replace with your admin IDs
 ADMIN_IDS = [int(x) for x in os.getenv("ADMIN_IDS", "").split(",") if x.strip()]
 
 def is_admin(user_id: int) -> bool:
     return user_id in ADMIN_IDS
+
 
 # ------------------ ADMIN COMMANDS ------------------
 
@@ -34,6 +38,7 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 pass
     await update.message.reply_text(f"✅ Broadcast sent to {count} users.")
 
+
 async def setwelcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.effective_user.id):
         return
@@ -45,6 +50,7 @@ async def setwelcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
     config_data["welcome_message"] = " ".join(context.args)
     save_config(config_data)
     await update.message.reply_text("✅ Welcome message updated.")
+
 
 async def addcredits(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.effective_user.id):
@@ -64,6 +70,7 @@ async def addcredits(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_data["credits"] = user_data.get("credits", 0) + amount
     await save_user(user_id, user_data)
     await update.message.reply_text(f"✅ Added {amount} credits to user {user_id}.")
+
 
 async def setplan(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.effective_user.id):
@@ -90,6 +97,7 @@ async def setplan(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"✅ Plan '{plan_name}' set for user {user_id} for {days} days."
     )
 
+
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.effective_user.id):
         return
@@ -98,6 +106,7 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     total_users = len([f for f in os.listdir(db_folder) if f.endswith(".json")])
     await update.message.reply_text(f"📊 Total users: {total_users}")
 
+
 async def listusers(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.effective_user.id):
         return
@@ -105,3 +114,49 @@ async def listusers(update: Update, context: ContextTypes.DEFAULT_TYPE):
     db_folder = "db"
     users = [f.replace(".json", "") for f in os.listdir(db_folder) if f.endswith(".json")]
     await update.message.reply_text("👥 Users:\n" + "\n".join(users))
+
+
+# ------------------ TASK MANAGEMENT ------------------
+
+async def addtask(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update.effective_user.id):
+        return
+    if not context.args:
+        return await update.message.reply_text("Usage: /addtask <json_task>")
+
+    try:
+        task_json = " ".join(context.args)
+        task = json.loads(task_json)
+        TASKS.append(task)
+        await update.message.reply_text(f"✅ Task added: {task['title']}")
+    except Exception as e:
+        await update.message.reply_text(f"❌ Failed to add task: {e}")
+
+
+async def viewtasks(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update.effective_user.id):
+        return
+    if not TASKS:
+        return await update.message.reply_text("⚠️ No tasks available.")
+
+    message = "📋 Current Tasks:\n\n"
+    for i, task in enumerate(TASKS, start=1):
+        message += f"{i}. {task['title']} (Reward: {task['reward']})\n"
+    await update.message.reply_text(message)
+
+
+async def deletetask(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update.effective_user.id):
+        return
+    if not context.args:
+        return await update.message.reply_text("Usage: /deletetask <task_number>")
+
+    try:
+        index = int(context.args[0]) - 1
+        if 0 <= index < len(TASKS):
+            removed = TASKS.pop(index)
+            await update.message.reply_text(f"🗑️ Task removed: {removed['title']}")
+        else:
+            await update.message.reply_text("❌ Invalid task number.")
+    except ValueError:
+        await update.message.reply_text("❌ Task number must be a number.")
