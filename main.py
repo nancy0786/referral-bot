@@ -45,20 +45,18 @@ from handlers.videos import (
     get_video_command,
     fetch_videos   # ✅ NEW
 )
-from handlers.tasks import show_tasks, handle_task_done
+from handlers.tasks import show_tasks, handle_open_link, handle_task_done
 from handlers.profile import show_profile
 from handlers.redeem import start_redeem_command, start_redeem_from_menu, handle_redeem_text
-from handlers import admin, session
+from handlers import admin, session, tasks
 from handlers.admin_restore import restore_db_command
 from plan_system import check_and_update_expiry, refill_free_plan_credits
 from admin_commands import admin_set_plan
 from user_system import ensure_user_registered
 from utils.db import update_last_active
-from handlers.tasks import show_tasks, handle_open_link, handle_task_done
-from handlers.profile import show_profile
 from handlers.giveaways import show_giveaways, handle_giveaway_callback
 from handlers.referral import referral_command
-from handlers import admin, tasks   # make sure handlers/admin.py and handlers/tasks.py exist
+
 # ========================
 # LOGGING
 # ========================
@@ -110,10 +108,20 @@ def main():
     # Middleware
     app.add_handler(MessageHandler(filters.ALL, activity_middleware), group=-1)
 
-    # Commands
+    # ========================
+    # USER COMMANDS
+    # ========================
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("menu", send_main_menu))
     app.add_handler(CommandHandler("redeem", start_redeem_command))
+    app.add_handler(CommandHandler("tasks", tasks.show_tasks))
+    app.add_handler(CommandHandler("profile", show_profile))
+    app.add_handler(CommandHandler("giveaways", show_giveaways))
+    app.add_handler(CommandHandler("referral", referral_command))
+
+    # ========================
+    # ADMIN COMMANDS
+    # ========================
     app.add_handler(CommandHandler("restore_db", restore_db_command))
     app.add_handler(CommandHandler("set_plan", admin_set_plan))
     app.add_handler(CommandHandler("broadcast", admin.broadcast))
@@ -122,49 +130,44 @@ def main():
     app.add_handler(CommandHandler("setplan", admin.setplan))
     app.add_handler(CommandHandler("stats", admin.stats))
     app.add_handler(CommandHandler("listusers", admin.listusers))
-    app.add_handler(CommandHandler("tasks", show_tasks))
-    app.add_handler(CommandHandler("profile", show_profile))
-    app.add_handler(CommandHandler("giveaways", show_giveaways))
-    app.add_handler(CommandHandler("referral", referral_command))
-    app.add_handler(CommandHandler("addtask", admin.addtask))       # NEW
-    app.add_handler(CommandHandler("viewtasks", admin.viewtasks))   # NEW
-    app.add_handler(CommandHandler("deletetask", admin.deletetask)) # NEW
-    app.add_handler(CommandHandler("addtasks", tasks.add_task))
-    app.add_handler(CommandHandler("viewtasks", tasks.view_tasks))
-    app.add_handler(CommandHandler("deletetasks", tasks.delete_task))
-    # NEW video commands
+    app.add_handler(CommandHandler("addtask", admin.addtask))       # ✅ Admin only
+    app.add_handler(CommandHandler("viewtasks", admin.viewtasks))   # ✅ Admin only
+    app.add_handler(CommandHandler("deletetask", admin.deletetask)) # ✅ Admin only
+    app.add_handler(CommandHandler("fetchvid", fetch_videos))       # ✅ Admin video fetch
+
+    # ========================
+    # VIDEO COMMANDS
+    # ========================
     app.add_handler(CommandHandler("videolist", videolist_command))
     app.add_handler(CommandHandler("videodetails", videodetails_command))
     app.add_handler(CommandHandler("video", get_video_command))
-    app.add_handler(CommandHandler("fetchvid", fetch_videos))  # ✅ NEW admin fetch command
 
-    # CallbackQueryHandlers
+    # ========================
+    # CALLBACKS
+    # ========================
     app.add_handler(CallbackQueryHandler(handle_recheck_join, pattern=f"^{RECHECK_BTN_DATA}$"))
     app.add_handler(CallbackQueryHandler(start_redeem_from_menu, pattern="^menu_redeem$"))
     app.add_handler(CallbackQueryHandler(handle_menu_callback, pattern="^menu_"))
     app.add_handler(CallbackQueryHandler(video_menu, pattern="^menu_videos$"))
     app.add_handler(CallbackQueryHandler(handle_watch_video, pattern="^watch_"))
     app.add_handler(CallbackQueryHandler(handle_download_video, pattern="^download_"))
-    app.add_handler(CallbackQueryHandler(show_tasks, pattern="^tasks$"))
-    app.add_handler(CallbackQueryHandler(handle_task_done, pattern="^task_done_"))
+    app.add_handler(CallbackQueryHandler(tasks.show_tasks, pattern="^tasks$"))
+    app.add_handler(CallbackQueryHandler(tasks.handle_open_link, pattern="^open_"))
+    app.add_handler(CallbackQueryHandler(tasks.handle_task_done, pattern="^task_done_"))
     app.add_handler(CallbackQueryHandler(show_profile, pattern="^profile$"))
     app.add_handler(CallbackQueryHandler(referral_command, pattern="^ref_link$"))
-    app.add_handler(CallbackQueryHandler(handle_open_link, pattern="^open_"))
-    app.add_handler(CallbackQueryHandler(handle_task_done, pattern="^task_done_"))
     app.add_handler(CallbackQueryHandler(handle_giveaway_callback, pattern="^join_"))
-    app.add_handler(CommandHandler("addtask", admin.addtask))       # NEW
-    app.add_handler(CommandHandler("viewtasks", admin.viewtasks))   # NEW
-    app.add_handler(CommandHandler("deletetask", admin.deletetask)) # NEW
-    # Forwarded messages (Sponsor Verification)
-    app.add_handler(MessageHandler(filters.FORWARDED, handle_forward))
 
-    # Redeem text
+    # ========================
+    # MESSAGE HANDLERS
+    # ========================
+    app.add_handler(MessageHandler(filters.FORWARDED, handle_forward))  # Sponsor Verification
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_redeem_text))
-
-    # General messages
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo_command))
 
-    # Background jobs
+    # ========================
+    # BACKGROUND JOBS
+    # ========================
     job_queue = app.job_queue
     job_queue.run_repeating(session.check_sessions, interval=60, first=60)
 
