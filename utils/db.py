@@ -172,7 +172,6 @@ async def get_user_videos(user_id: int):
     return user.get("videos", {"fetched": [], "watched": [], "tags": {}})
 
 
-
 # ---------------- TASKS MANAGEMENT ----------------
 
 TASKS_FILE = os.path.join(config.DATA_FOLDER, "tasks.json")
@@ -183,15 +182,35 @@ if not os.path.exists(TASKS_FILE):
         json.dump([], f)
 
 
+def _normalize_task(task: Dict[str, Any], index: int) -> Dict[str, Any]:
+    """Ensure task dict has all required fields"""
+    return {
+        "id": str(task.get("id", f"task_{index}")),
+        "title": task.get("title", f"Task {index+1}"),
+        "reward": int(task.get("reward", 0)),
+        "link": task.get("link", None)
+    }
+
+
 async def get_all_tasks() -> List[Dict[str, Any]]:
-    """Return all global tasks"""
-    async with aiofiles.open(TASKS_FILE, "r", encoding="utf-8") as f:
-        raw = await f.read()
-        return json.loads(raw) if raw else []
+    """Return all global tasks (safe, always valid)."""
+    try:
+        async with aiofiles.open(TASKS_FILE, "r", encoding="utf-8") as f:
+            raw = await f.read()
+            tasks = json.loads(raw) if raw else []
+    except Exception:
+        tasks = []
+
+    # Normalize tasks
+    tasks = [_normalize_task(t, i) for i, t in enumerate(tasks)]
+    return tasks
 
 
 async def save_all_tasks(tasks: List[Dict[str, Any]]):
-    """Save global tasks list"""
+    """Save global tasks list safely."""
+    # Normalize before saving
+    tasks = [_normalize_task(t, i) for i, t in enumerate(tasks)]
+
     tmp_fd, tmp_path = tempfile.mkstemp()
     try:
         async with aiofiles.open(tmp_path, "w", encoding="utf-8") as f:
@@ -227,7 +246,6 @@ async def mark_task_completed(user_id: int, task_id: str):
     if task_id not in user["tasks_completed"]:
         user["tasks_completed"].append(task_id)
     await save_user(user_id, user)
-
 
 # Backward compatibility for older handlers
 async def get_user_data(user_id: int):
