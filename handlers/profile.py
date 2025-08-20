@@ -5,7 +5,7 @@ from telegram.ext import ContextTypes
 
 async def show_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    user_data = get_user_data(user_id) or {}  # ✅ Prevent None errors
+    user_data = await get_user_data(user_id) or {}  # ✅ Prevent None errors
 
     # Basic details
     name = user_data.get("name") or update.effective_user.first_name
