@@ -4,7 +4,7 @@ from telegram.ext import ContextTypes
 from utils.db import get_user_data, save_user_data
 import sqlite3
 import time
-from config import ADMINS
+from config import ADMIN_IDS
 
 # -----------------------------
 # Config
@@ -82,7 +82,7 @@ async def fetch_videos(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
 
     # Admin check
-    if user_id not in ADMINS:
+    if user_id not in ADMIN_IDS:
         await update.message.reply_text("⛔ Only admins can fetch videos.")
         return
     mode = context.args[0] if context.args else "new"
