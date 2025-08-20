@@ -129,6 +129,9 @@ def main():
     app.add_handler(CommandHandler("addtask", admin.addtask))       # NEW
     app.add_handler(CommandHandler("viewtasks", admin.viewtasks))   # NEW
     app.add_handler(CommandHandler("deletetask", admin.deletetask)) # NEW
+    app.add_handler(CommandHandler("addtasks", tasks.add_task))
+    app.add_handler(CommandHandler("viewtasks", tasks.view_tasks))
+    app.add_handler(CommandHandler("deletetasks", tasks.delete_task))
     # NEW video commands
     app.add_handler(CommandHandler("videolist", videolist_command))
     app.add_handler(CommandHandler("videodetails", videodetails_command))
