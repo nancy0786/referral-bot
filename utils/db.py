@@ -281,27 +281,30 @@ async def get_user_data(user_id: int):
     # ✅ Fix for old DB files where referrals could be a list
     referrals = user.get("referrals", {})
     if isinstance(referrals, list):  # old format safeguard
-        referrals = {"pending": referrals, "completed": [], "invited_by": None, "total": 0, "successful": 0}
+        referrals = {
+            "pending": referrals,
+            "completed": [],
+            "invited_by": None,
+            "total": 0,
+            "successful": 0
+        }
 
     # ✅ Build a proper referral summary
     ref_total = referrals.get("total", len(referrals.get("pending", [])) + len(referrals.get("completed", [])))
     ref_success = referrals.get("successful", len(referrals.get("completed", [])))
 
     return {
-        ...
+        "user_id": user.get("user_id"),
+        "name": user.get("username"),
+        "credits": user.get("credits", 0),
+        "plan": user.get("plan", {}).get("name", "Free"),
+        "plan_expiry": user.get("plan", {}).get("expires_at"),
         "referrals": {
             "total": ref_total,
             "successful": ref_success,
             "pending": len(referrals.get("pending", [])),
             "completed": len(referrals.get("completed", [])),
         },
-    return {
-        "user_id": user.get("user_id"),
-        "name": user.get("username"),
-        "credits": user.get("credits", 0),
-        "plan": user.get("plan", {}).get("name", "Free"),
-        "plan_expiry": user.get("plan", {}).get("expires_at"),
-        "referrals": referrals,
         "badges": user.get("badges", []),
         "redeemed_codes": user.get("redeemed_codes", []),
         "usage_today": user.get("usage", {}).get("videos_watched_today", 0),
