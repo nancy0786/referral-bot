@@ -76,8 +76,6 @@ def set_last_msg_id(msg_id):
 # -----------------------------
 # Admin: Fetch Videos (/fetchvid)
 # -----------------------------
-
-
 async def fetch_videos(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
 
@@ -93,7 +91,9 @@ async def fetch_videos(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("📡 Fetching videos from channel...")
 
     try:
-        async for msg in context.bot.get_chat(VIDEO_CHANNEL).iter_history(limit=2000, offset_id=last_id):
+        # Fix: Await get_chat and use get_chat_history
+        chat = await context.bot.get_chat(VIDEO_CHANNEL)
+        async for msg in chat.get_history(limit=2000, offset_id=last_id):
             if not msg.caption:
                 continue
 
@@ -137,7 +137,7 @@ async def get_video_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     vid_num = context.args[0].lstrip("#")
     user_id = update.effective_user.id
-    data = get_user_data(user_id)
+    data = await get_user_data(user_id)
 
     plan = data.get("plan", "free")
     credits = data.get("credits", 0)
@@ -148,13 +148,13 @@ async def get_video_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if plan == "premium":
         if expiry and now > expiry:
             data["plan"] = "free"
-            save_user_data(user_id, data)
+            await save_user_data(user_id, data)
             await update.message.reply_text("⚠️ Premium expired. Upgrade required.")
             return
     elif plan == "credit":
         if credits > 0:
             data["credits"] -= 1
-            save_user_data(user_id, data)
+            await save_user_data(user_id, data)
         else:
             await update.message.reply_text("💳 Not enough credits.")
             return
@@ -212,7 +212,7 @@ async def handle_video_number(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     vid_num = update.message.text.strip()
     user_id = update.effective_user.id
-    data = get_user_data(user_id)
+    data = await get_user_data(user_id)
 
     plan = data.get("plan", "free")
     credits = data.get("credits", 0)
@@ -222,13 +222,13 @@ async def handle_video_number(update: Update, context: ContextTypes.DEFAULT_TYPE
     if plan == "premium":
         if expiry and now > expiry:
             data["plan"] = "free"
-            save_user_data(user_id, data)
+            await save_user_data(user_id, data)
             await update.message.reply_text("⚠️ Your Premium plan expired. Upgrade needed.")
             return
     elif plan == "credit":
         if credits > 0:
             data["credits"] -= 1
-            save_user_data(user_id, data)
+            await save_user_data(user_id, data)
         else:
             await update.message.reply_text("💳 No credits left. Complete tasks or upgrade plan.")
             return
@@ -252,7 +252,7 @@ async def handle_download_video(update: Update, context: ContextTypes.DEFAULT_TY
     query = update.callback_query
     vid_num = query.data.replace("download_", "")
     user_id = query.from_user.id
-    data = get_user_data(user_id)
+    data = await get_user_data(user_id)
 
     plan = data.get("plan", "free")
     credits = data.get("credits", 0)
@@ -262,13 +262,13 @@ async def handle_download_video(update: Update, context: ContextTypes.DEFAULT_TY
     if plan == "premium":
         if expiry and now > expiry:
             data["plan"] = "free"
-            save_user_data(user_id, data)
+            await save_user_data(user_id, data)
             await query.edit_message_text("⚠️ Premium expired. Cannot download.")
             return
     elif plan == "credit":
         if credits > 0:
             data["credits"] -= 1
-            save_user_data(user_id, data)
+            await save_user_data(user_id, data)
         else:
             await query.answer("💳 No credits left.", show_alert=True)
             return
