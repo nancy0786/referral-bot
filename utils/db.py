@@ -176,12 +176,17 @@ async def get_user_videos(user_id: int):
 async def get_user_data(user_id: int):
     """Return user data in old-style dict format for legacy handlers."""
     user = await get_user(user_id)
-    # Convert async structure to match old get_user_data
+
+    # ✅ Fix for old DB files where referrals could be a list
+    referrals = user.get("referrals", {})
+    if isinstance(referrals, list):  # old format
+        referrals = {"pending": referrals, "completed": [], "invited_by": None, "total": 0, "successful": 0}
+
     return {
         "credits": user.get("credits", 0),
         "plan": user.get("plan", {}).get("name", "Free"),
         "plan_expiry": user.get("plan", {}).get("expires_at"),
-        "referrals": user.get("referrals", {}).get("pending", []),
+        "referrals": referrals.get("pending", []),
         "badges": user.get("badges", []),
         "redeemed_codes": user.get("redeemed_codes", []),
         "usage_today": user.get("usage", {}).get("videos_watched_today", 0),
@@ -191,9 +196,15 @@ async def get_user_data(user_id: int):
         "active_messages": user.get("active_messages", [])
     }
 
+
 async def save_user_data(user_id: int, data: dict):
     """Save user data in old-style format for legacy handlers."""
     user = await get_user(user_id)
+
+    # ✅ Fix for old DB files where referrals could be a list
+    if isinstance(user.get("referrals"), list):
+        user["referrals"] = {"pending": user["referrals"], "completed": [], "invited_by": None, "total": 0, "successful": 0}
+
     user["credits"] = data.get("credits", user.get("credits", 0))
     user["plan"]["name"] = data.get("plan", user.get("plan", {}).get("name", "Free"))
     user["plan"]["expires_at"] = data.get("plan_expiry", user.get("plan", {}).get("expires_at"))
