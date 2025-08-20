@@ -1,5 +1,6 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
+from handlers.profile import show_profile
 
 async def send_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, edit=False) -> None:
     keyboard = [
