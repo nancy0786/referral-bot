@@ -1,6 +1,6 @@
 # handlers/videos.py
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import ContextTypes
+from telegram.ext import ContextTypes, MessageHandler, filters
 from utils.db import get_user_data, save_user_data
 import sqlite3
 import time
@@ -50,7 +50,6 @@ def get_video(vid_num):
     return row[0] if row else None
 
 def get_all_videos(limit=20):
-    """Return list of all video numbers saved in DB"""
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     cur.execute("SELECT vid_num FROM videos ORDER BY CAST(vid_num AS INTEGER) ASC LIMIT ?", (limit,))
@@ -79,53 +78,41 @@ def set_last_msg_id(msg_id):
 async def fetch_videos(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
 
-    # Admin check
     if user_id not in ADMIN_IDS:
         await update.message.reply_text("⛔ Only admins can fetch videos.")
         return
-    mode = context.args[0] if context.args else "new"
-    last_id = 0 if mode == "all" else get_last_msg_id()
-    count = 0
-    max_id = last_id
 
-    await update.message.reply_text("📡 Fetching videos from channel...")
+    await update.message.reply_text(
+        "📡 The bot will now automatically save new videos sent in the channel.\n"
+        "⚠️ Old videos cannot be fetched due to Telegram Bot API limitations."
+    )
 
-    try:
-        # Fix: Await get_chat and use get_chat_history
-        chat = await context.bot.get_chat(VIDEO_CHANNEL)
-        async for msg in chat.get_history(limit=2000, offset_id=last_id):
-            if not msg.caption:
-                continue
+# -----------------------------
+# Auto-fetch new channel videos
+# -----------------------------
+async def new_channel_post(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = update.channel_post
+    if not msg.caption:
+        return
 
-            vid_num = None
-            parts = msg.caption.split()
-            for p in parts:
-                if p.isdigit():
-                    vid_num = p
-                    break
+    vid_num = None
+    for part in msg.caption.split():
+        if part.isdigit():
+            vid_num = part
+            break
+    if not vid_num:
+        return
 
-            if not vid_num:
-                continue
+    file_id = None
+    if msg.video:
+        file_id = msg.video.file_id
+    elif msg.document:
+        file_id = msg.document.file_id
 
-            file_id = None
-            if msg.video:
-                file_id = msg.video.file_id
-            elif msg.document:
-                file_id = msg.document.file_id
-
-            if file_id:
-                save_video(vid_num, file_id, msg.message_id)
-                count += 1
-                if msg.message_id > max_id:
-                    max_id = msg.message_id
-
-        if count > 0:
-            set_last_msg_id(max_id)
-            await update.message.reply_text(f"✅ {count} videos fetched and saved to DB!")
-        else:
-            await update.message.reply_text("ℹ️ No new videos found.")
-    except Exception as e:
-        await update.message.reply_text(f"❌ Error: {e}")
+    if file_id:
+        save_video(vid_num, file_id, msg.message_id)
+        set_last_msg_id(msg.message_id)
+        print(f"✅ Saved video {vid_num} from channel!")
 
 # -----------------------------
 # User: Get specific video (/video #num)
@@ -162,7 +149,6 @@ async def get_video_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⛔ Free plan cannot access this video.")
         return
 
-    # Fetch from DB
     video_file_id = get_video(vid_num)
     if not video_file_id:
         await update.message.reply_text("❌ Video not found in DB. Ask admin to run /fetchvid.")
@@ -174,7 +160,7 @@ async def get_video_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Admin: List available videos (/videolist)
 # -----------------------------
 async def videolist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    videos = get_all_videos(limit=50)  # show first 50 numbers
+    videos = get_all_videos(limit=50)
     if not videos:
         await update.message.reply_text("📂 No videos found in database. Admin must run /fetchvid first.")
         return
@@ -186,7 +172,6 @@ async def videolist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # User: Video details (/videodetails)
 # -----------------------------
 async def videodetails_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Show users the list of videos available in DB (like videolist but for all users)."""
     videos = get_all_videos(limit=50)
     if not videos:
         await update.message.reply_text("📂 No videos available. Please wait until admin uploads/fetches videos.")
@@ -196,17 +181,15 @@ async def videodetails_command(update: Update, context: ContextTypes.DEFAULT_TYP
     await update.message.reply_text(f"🎥 Available Videos:\n{video_list}\n\nUse /video <number> to watch.")
 
 # -----------------------------
-# Existing logic (unchanged but now uses DB)
+# Existing logic (unchanged)
 # -----------------------------
 async def send_video_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Prompt user to enter video number."""
     await update.callback_query.edit_message_text(
         "🎥 Please send the video number you want to watch (e.g., 1, 2, 3):"
     )
     context.user_data["awaiting_video_number"] = True
 
 async def handle_video_number(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handles user input for video number."""
     if not context.user_data.get("awaiting_video_number"):
         return
 
@@ -248,7 +231,6 @@ async def handle_video_number(update: Update, context: ContextTypes.DEFAULT_TYPE
     context.user_data["awaiting_video_number"] = False
 
 async def handle_download_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle download request with plan/credits check."""
     query = update.callback_query
     vid_num = query.data.replace("download_", "")
     user_id = query.from_user.id
