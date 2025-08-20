@@ -16,11 +16,19 @@ async def show_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     verified = "✅ Verified" if user_data.get("sponsor_verified", False) else "❌ Not Verified"
 
     # Progress
-    tasks_done = len(user_data.get("tasks_completed", []))  # ✅ only direct task completions
+    tasks_done = len(user_data.get("tasks_completed", []))  # ✅ real completed tasks
     badges = ", ".join(user_data.get("badges", [])) or "None"
 
-    # Referral
-    ref_count = user_data.get("referrals", 0)
+    # Referrals (✅ handle total, successful, pending properly)
+    referrals = user_data.get("referrals", {})
+    if isinstance(referrals, dict):
+        ref_total = referrals.get("total", 0)
+        ref_success = referrals.get("successful", 0)
+        ref_pending = len(referrals.get("pending", []))
+    else:
+        # fallback for old format
+        ref_total, ref_success, ref_pending = 0, 0, 0
+
     ref_link = user_data.get("ref_link", "Not generated yet")
 
     msg = (
@@ -36,7 +44,9 @@ async def show_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"• Tasks Completed: {tasks_done}\n"
         f"• Badges: {badges}\n\n"
         f"👥 **Referrals**\n"
-        f"• Total Referrals: {ref_count}\n"
+        f"• Total Referrals: {ref_total}\n"
+        f"• Successful Referrals: {ref_success}\n"
+        f"• Pending Referrals: {ref_pending}\n"
         f"• Referral Link: {ref_link}"
     )
 
