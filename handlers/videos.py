@@ -4,6 +4,7 @@ from telegram.ext import ContextTypes
 from utils.db import get_user_data, save_user_data
 import sqlite3
 import time
+from config import ADMINS
 
 # -----------------------------
 # Config
@@ -75,14 +76,15 @@ def set_last_msg_id(msg_id):
 # -----------------------------
 # Admin: Fetch Videos (/fetchvid)
 # -----------------------------
+
+
 async def fetch_videos(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
 
     # Admin check
-    if str(user_id) not in getattr(context.bot_data, "ADMINS", ["123456789"]):
+    if user_id not in ADMINS:
         await update.message.reply_text("⛔ Only admins can fetch videos.")
         return
-
     mode = context.args[0] if context.args else "new"
     last_id = 0 if mode == "all" else get_last_msg_id()
     count = 0
