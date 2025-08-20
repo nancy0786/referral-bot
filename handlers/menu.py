@@ -31,7 +31,7 @@ async def handle_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     if data == "menu_videos":
         await query.edit_message_text("🎥 Video section coming soon...")
     elif data == "menu_profile":
-        await query.edit_message_text("🏆 Profile details will be shown here.")
+        await show_profile(update, context)  # ✅ Call real profile handler
     elif data == "menu_tasks":
         from handlers.giveaways import show_giveaways
         await show_giveaways(update, context)
