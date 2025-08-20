@@ -1,12 +1,11 @@
 # handlers/profile.py
-
 from utils.db import get_user_data
 from telegram import Update
 from telegram.ext import ContextTypes
 
 async def show_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    user_data = get_user_data(user_id)
+    user_data = get_user_data(user_id) or {}  # ✅ Prevent None errors
 
     # Basic details
     name = user_data.get("name") or update.effective_user.first_name
@@ -24,7 +23,6 @@ async def show_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ref_count = user_data.get("referrals", 0)
     ref_link = user_data.get("ref_link", "Not generated yet")
 
-    # Message
     msg = (
         f"👤 **Your Profile**\n\n"
         f"• Name: {name}\n"
@@ -42,7 +40,6 @@ async def show_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"• Referral Link: {ref_link}"
     )
 
-    # Handle both /profile (message) and button tap (callback_query)
     if update.message:
         await update.message.reply_text(msg, parse_mode="Markdown")
     elif update.callback_query:
