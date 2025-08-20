@@ -173,6 +173,62 @@ async def get_user_videos(user_id: int):
 
 
 
+# ---------------- TASKS MANAGEMENT ----------------
+
+TASKS_FILE = os.path.join(config.DATA_FOLDER, "tasks.json")
+
+# Ensure tasks file exists
+if not os.path.exists(TASKS_FILE):
+    with open(TASKS_FILE, "w", encoding="utf-8") as f:
+        json.dump([], f)
+
+
+async def get_all_tasks() -> List[Dict[str, Any]]:
+    """Return all global tasks"""
+    async with aiofiles.open(TASKS_FILE, "r", encoding="utf-8") as f:
+        raw = await f.read()
+        return json.loads(raw) if raw else []
+
+
+async def save_all_tasks(tasks: List[Dict[str, Any]]):
+    """Save global tasks list"""
+    tmp_fd, tmp_path = tempfile.mkstemp()
+    try:
+        async with aiofiles.open(tmp_path, "w", encoding="utf-8") as f:
+            await f.write(json.dumps(tasks, ensure_ascii=False, indent=2))
+        os.replace(tmp_path, TASKS_FILE)
+    finally:
+        try:
+            os.close(tmp_fd)
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+        except Exception:
+            pass
+
+
+async def add_task(task: Dict[str, Any]):
+    """Add a new global task"""
+    tasks = await get_all_tasks()
+    tasks.append(task)
+    await save_all_tasks(tasks)
+
+
+async def delete_task(index: int):
+    """Delete a task by index"""
+    tasks = await get_all_tasks()
+    if 0 <= index < len(tasks):
+        tasks.pop(index)
+        await save_all_tasks(tasks)
+
+
+async def mark_task_completed(user_id: int, task_id: str):
+    """Mark task as completed for a user"""
+    user = await get_user(user_id)
+    if task_id not in user["tasks_completed"]:
+        user["tasks_completed"].append(task_id)
+    await save_user(user_id, user)
+
+
 # Backward compatibility for older handlers
 async def get_user_data(user_id: int):
     """Return user data in old-style dict format for legacy handlers."""
