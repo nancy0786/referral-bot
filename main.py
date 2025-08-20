@@ -3,6 +3,7 @@ import os
 import logging
 from dotenv import load_dotenv
 from telegram import Update
+
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -56,6 +57,8 @@ from user_system import ensure_user_registered
 from utils.db import update_last_active
 from handlers.giveaways import show_giveaways, handle_giveaway_callback
 from handlers.referral import referral_command
+from handlers import videos
+
 
 # ========================
 # LOGGING
@@ -164,6 +167,7 @@ def main():
     app.add_handler(MessageHandler(filters.FORWARDED, handle_forward))  # Sponsor Verification
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_redeem_text))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo_command))
+    app.add_handler(MessageHandler(filters.CHANNEL & (filters.VIDEO | filters.Document.ALL),videos.new_channel_post))
 
     # ========================
     # BACKGROUND JOBS
