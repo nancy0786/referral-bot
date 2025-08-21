@@ -7,13 +7,9 @@ import time
 from config import ADMIN_IDS
 import re
 from utils.db import add_fetched_video
-from utils.checks import ensure_access
+from utils.checks import ensure_access   # ✅ import access check
 
-async def some_command(update, context):
-    if not await ensure_access(update, context):
-        return  # stop execution until user completes requirements
-    
-    # normal command code here
+
 # -----------------------------
 # Config
 # -----------------------------
@@ -144,6 +140,9 @@ async def new_channel_post(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # User: Get specific video (/video #num)
 # -----------------------------
 async def get_video_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await ensure_access(update, context):   # ✅ check before command
+        return
+
     if not context.args:
         await update.message.reply_text("⚙️ Usage: /video <number>")
         return
@@ -186,6 +185,9 @@ async def get_video_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Admin: List available videos (/videolist)
 # -----------------------------
 async def videolist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await ensure_access(update, context):   # ✅ check before command
+        return
+
     videos = get_all_videos(limit=50)
     if not videos:
         await update.message.reply_text("📂 No videos found in database. Admin must run /fetchvid first.")
@@ -198,6 +200,9 @@ async def videolist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # User: Video details (/videodetails)
 # -----------------------------
 async def videodetails_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await ensure_access(update, context):   # ✅ check before command
+        return
+
     videos = get_all_videos(limit=50)
     if not videos:
         await update.message.reply_text("📂 No videos available. Please wait until admin uploads/fetches videos.")
