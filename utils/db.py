@@ -8,6 +8,7 @@ import tempfile
 from typing import Dict, Any, Optional, List
 import config
 from . import backup  # backup.update_user_backup
+import sqlite3
 
 # Ensure main data folder exists
 os.makedirs(config.DATA_FOLDER, exist_ok=True)
@@ -311,6 +312,67 @@ async def mark_task_completed(user_id: int, task_id: str, reward: int = 0):
     user["credits"] = int(user.get("credits", 0)) + int(reward or 0)
     await save_user(user_id, user)
     return True, f"🎉 Task completed! +{int(reward or 0)} credits"
+
+
+# db.py
+
+
+DB_NAME = "bot_database.db"
+
+def init_db():
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
+    # Existing tables ...
+
+    # Video Categories table
+    cursor.execute('''CREATE TABLE IF NOT EXISTS video_categories (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        category_name TEXT UNIQUE,
+                        video_range TEXT
+                    )''')
+
+    conn.commit()
+    conn.close()
+
+
+# =====================
+# VIDEO CATEGORY FUNCTIONS
+# =====================
+
+def add_or_update_category(category_name: str, video_range: str):
+    """Add a new category or update if already exists."""
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute('''INSERT INTO video_categories (category_name, video_range)
+                      VALUES (?, ?)
+                      ON CONFLICT(category_name) DO UPDATE SET video_range=excluded.video_range''',
+                   (category_name, video_range))
+    conn.commit()
+    conn.close()
+
+
+def delete_category(category_name: str):
+    """Delete a category by name."""
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM video_categories WHERE category_name = ?", (category_name,))
+    conn.commit()
+    conn.close()
+
+
+def get_all_categories():
+    """Return all categories as list of tuples (category_name, video_range)."""
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT category_name, video_range FROM video_categories ORDER BY id")
+    rows = cursor.fetchall()
+    conn.close()
+    return rows
+
+
+
+
 
 # Backward compatibility for older handlers
 async def get_user_data(user_id: int):
