@@ -40,7 +40,6 @@ from handlers.videos import (
     video_menu,
     handle_watch_video,
     handle_download_video,
-    videolist_command,
     videodetails_command,
     get_video_command,
     fetch_videos   # ✅ NEW
@@ -58,6 +57,7 @@ from handlers.giveaways import show_giveaways, handle_giveaway_callback
 from handlers.referral import referral_command
 from handlers import videos
 from utils.db import update_last_active, init_video_categories_table
+from handlers.admin import videolist_command   # ✅ admin side
 
 # ========================
 # LOGGING
