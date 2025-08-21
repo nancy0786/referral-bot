@@ -11,6 +11,7 @@ from utils.checks import ensure_access   # ✅ import access check
 from utils.db import add_or_update_category, get_all_categories
 
 
+
 # -----------------------------
 # Config
 # -----------------------------
@@ -210,21 +211,18 @@ async def categories_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
     msg = "\n".join([f"📂 {c[0]} → {c[1]}" for c in cats])
     await update.message.reply_text(f"📂 Categories:\n{msg}")
 
-# -----------------------------
-# User: Video details (/videodetails)
-# -----------------------------
+
+
+
 async def videodetails_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await ensure_access(update, context):
-        return
-
-    videos = get_all_videos(limit=50)
-    if not videos:
-        await update.message.reply_text("📂 No videos available. Please wait until admin uploads/fetches videos.")
-        return
-
-    video_list = "\n".join([f"📹 #{v}" for v in videos])
-    await update.message.reply_text(f"🎥 Available Videos:\n{video_list}\n\nUse /video <number> to watch.")
-
+    """User command: show video categories list."""
+    categories = get_all_categories()
+    if not categories:
+        return await update.message.reply_text("⚠️ No video categories available.")
+    msg = "🎬 Available Video Categories:\n\n"
+    for cat, vids in categories:
+        msg += f"🔹 {cat}: {vids}\n"
+    await update.message.reply_text(msg)
 # -----------------------------
 # Existing logic (unchanged)
 # -----------------------------
