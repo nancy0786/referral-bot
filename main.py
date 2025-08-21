@@ -58,6 +58,7 @@ from handlers.referral import referral_command
 from handlers import videos
 from utils.db import update_last_active, init_db
 from handlers.admin import videolist_command   # ✅ admin side
+from handlers.admin import addredeem_command
 
 # ========================
 # LOGGING
@@ -136,7 +137,7 @@ def main():
     app.add_handler(CommandHandler("viewtasks", admin.viewtasks))   # ✅ Admin only
     app.add_handler(CommandHandler("deletetask", admin.deletetask)) # ✅ Admin only
     app.add_handler(CommandHandler("fetchvid", fetch_videos))       # ✅ Admin video fetch
-
+    app.add_handler(CommandHandler("addredeem", addredeem_command))
     # ========================
     # VIDEO COMMANDS
     # ========================
