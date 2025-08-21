@@ -16,7 +16,8 @@ from utils.db import (
     get_all_categories
 )
 from utils.config import load_config, save_config
-from utils.db import add_or_update_category, delete_category, get_all_categories
+from utils.db import add_or_update_category, delete_category, get_all_categories, add_redeem_code, get_redeem_code, mark_code_used
+
 
 # Replace with your admin IDs
 ADMIN_IDS = [int(x) for x in os.getenv("ADMIN_IDS", "").split(",") if x.strip()]
@@ -231,3 +232,29 @@ async def videolist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "/videolist delete <CategoryName>\n"
             "/videolist json <JSON_OBJECT>"
         )
+
+
+# admin.py
+
+async def addredeem_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin command to create a redeem code."""
+    user_id = update.effective_user.id
+    if not is_admin(user_id):  # use your is_admin check
+        return await update.message.reply_text("❌ You are not authorized.")
+
+    if len(context.args) != 3:
+        return await update.message.reply_text(
+            "⚙️ Usage:\n"
+            "/addredeem <CODE> <CREDITS> <HOURS>\n"
+            "Example: /addredeem ABC123 50 24"
+        )
+
+    code = context.args[0].upper()
+    try:
+        credits = int(context.args[1])
+        hours = int(context.args[2])
+    except ValueError:
+        return await update.message.reply_text("❌ Credits and Hours must be integers.")
+
+    add_redeem_code(code, credits, hours)
+    await update.message.reply_text(f"✅ Redeem code '{code}' added: {credits} credits, {hours}h premium.")
