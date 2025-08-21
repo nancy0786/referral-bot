@@ -378,38 +378,89 @@ def init_redeem_codes_table():
 
 # db.py
 
-def add_redeem_code(code: str, credit_amount: int, duration_hours: int):
+import sqlite3
+import json
+
+DB_NAME = "bot_database.db"
+
+# -----------------------------
+# REDEEM CODES FUNCTIONS
+# -----------------------------
+
+def init_redeem_table():
+    """Initialize redeem_codes table if not exists."""
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
     cur.execute("""
-        INSERT OR REPLACE INTO redeem_codes (code, credit_amount, duration_hours)
-        VALUES (?, ?, ?)
-    """, (code.upper(), credit_amount, duration_hours))
+        CREATE TABLE IF NOT EXISTS redeem_codes (
+            code TEXT PRIMARY KEY,
+            credit_amount INTEGER NOT NULL,
+            duration_hours INTEGER NOT NULL,
+            used_by TEXT DEFAULT '[]'
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+
+def add_redeem_code(code: str, credit_amount: int, duration_hours: int):
+    """Add a new redeem code. Does not overwrite used_by history if code exists."""
+    code = code.upper()
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    # Check if code exists
+    cur.execute("SELECT used_by FROM redeem_codes WHERE code = ?", (code,))
+    row = cur.fetchone()
+    if row:
+        used_by_json = row[0] or "[]"
+        cur.execute("""
+            UPDATE redeem_codes
+            SET credit_amount=?, duration_hours=?, used_by=?
+            WHERE code=?
+        """, (credit_amount, duration_hours, used_by_json, code))
+    else:
+        cur.execute("""
+            INSERT INTO redeem_codes (code, credit_amount, duration_hours)
+            VALUES (?, ?, ?)
+        """, (code, credit_amount, duration_hours))
     conn.commit()
     conn.close()
 
 
 def get_redeem_code(code: str):
+    """Fetch redeem code details."""
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
     cur.execute("SELECT code, credit_amount, duration_hours, used_by FROM redeem_codes WHERE code = ?", (code.upper(),))
     row = cur.fetchone()
     conn.close()
-    return row  # tuple or None
+    if row:
+        # Convert used_by JSON string to Python list
+        code_str, credits, hours, used_by_json = row
+        used_by = json.loads(used_by_json or "[]")
+        return {
+            "code": code_str,
+            "credits": credits,
+            "duration_hours": hours,
+            "used_by": used_by
+        }
+    return None
 
 
 def mark_code_used(code: str, user_id: int):
-    row = get_redeem_code(code)
-    if not row:
-        return False
-    used_by = row[3].split(",") if row[3] else []
-    if str(user_id) in used_by:
-        return False
-    used_by.append(str(user_id))
-    used_by_str = ",".join(used_by)
+    """Mark a redeem code as used by a specific user."""
+    code_data = get_redeem_code(code)
+    if not code_data:
+        return False  # code not found
+
+    used_by = code_data["used_by"]
+    if user_id in used_by:
+        return False  # user already used this code
+
+    used_by.append(user_id)
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
-    cur.execute("UPDATE redeem_codes SET used_by=? WHERE code=?", (used_by_str, code.upper()))
+    cur.execute("UPDATE redeem_codes SET used_by=? WHERE code=?", (json.dumps(used_by), code.upper()))
     conn.commit()
     conn.close()
     return True
