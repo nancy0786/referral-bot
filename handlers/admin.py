@@ -10,7 +10,9 @@ from utils.db import (
     save_user,
     add_task,
     get_all_tasks,
-    delete_task
+    delete_task,
+    get_video_categories,   # ✅ new
+    save_video_categories   # ✅ new
 )
 from utils.config import load_config, save_config
 
@@ -19,7 +21,6 @@ ADMIN_IDS = [int(x) for x in os.getenv("ADMIN_IDS", "").split(",") if x.strip()]
 
 def is_admin(user_id: int) -> bool:
     return user_id in ADMIN_IDS
-
 
 # ------------------ ADMIN COMMANDS ------------------
 
@@ -172,3 +173,31 @@ async def deletetask(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ Invalid task number.")
     except ValueError:
         await update.message.reply_text("❌ Task number must be a number.")
+
+# ------------------ VIDEO LIST MANAGEMENT ------------------
+
+async def videolist(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin command to set or update video categories list."""
+    if not is_admin(update.effective_user.id):
+        return
+
+    if not context.args:
+        # Show current list
+        categories = get_video_categories()
+        if not categories:
+            return await update.message.reply_text("⚠️ No video categories set yet.")
+        msg = "📂 Current Video Categories:\n\n"
+        for cat, vids in categories.items():
+            msg += f"🔹 {cat}: {vids}\n"
+        return await update.message.reply_text(msg)
+
+    # Admin provided new list to update
+    try:
+        categories_json = " ".join(context.args)
+        categories = json.loads(categories_json)
+        if not isinstance(categories, dict):
+            return await update.message.reply_text("❌ Invalid format. Must be a JSON object.")
+        save_video_categories(categories)
+        await update.message.reply_text("✅ Video categories updated successfully.")
+    except Exception as e:
+        await update.message.reply_text(f"❌ Failed to update categories: {e}")
