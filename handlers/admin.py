@@ -234,20 +234,6 @@ async def videolist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 
-# admin.py
-
-import json
-from telegram import Update
-from telegram.ext import ContextTypes
-from utils.db import add_or_update_category, delete_category, get_all_categories, add_redeem_code
-
-ADMIN_IDS = [12345678]  # your admin Telegram user IDs
-
-
-def is_admin(user_id):
-    return user_id in ADMIN_IDS
-
-
 # Video list command
 async def videolist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
