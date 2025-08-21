@@ -110,7 +110,7 @@ def main():
     # ========================
     # USER COMMANDS
     # ========================
-    app.add_handler(CommandHandler("start", start_command))
+    app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("menu", send_main_menu))
     app.add_handler(CommandHandler("redeem", start_redeem_command))
     app.add_handler(CommandHandler("tasks", tasks.show_tasks))
