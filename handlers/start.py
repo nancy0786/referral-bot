@@ -133,7 +133,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             await ask_sponsor_verification(update, context)
             await log_new_user(context, user, ref_code)
             return
+            # start.py
+        verified = await auto_verify_sponsor(update, context)
 
+
+    
     # --------------------------------------------------------
     # Save profile
     # --------------------------------------------------------
