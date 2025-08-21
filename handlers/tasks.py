@@ -6,7 +6,6 @@ from telegram.ext import ContextTypes
 from utils.db import (
     get_all_tasks,
     get_user,
-    save_user,
     mark_task_opened,
     mark_task_completed
 )
@@ -18,7 +17,8 @@ logger = logging.getLogger(__name__)
 # ========================
 async def show_tasks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Show available tasks to the user."""
-    user_id = str(update.effective_user.id)
+    # ensure we use int user_id everywhere
+    user_id = update.effective_user.id
     tasks = await get_all_tasks()
     user = await get_user(user_id)
 
@@ -61,7 +61,12 @@ async def handle_open_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    idx = int(query.data.split("_")[1])
+    try:
+        idx = int(query.data.split("_")[1])
+    except Exception:
+        await query.edit_message_text("⚠️ Invalid task.")
+        return
+
     tasks = await get_all_tasks()
 
     if idx <= 0 or idx > len(tasks):
@@ -69,7 +74,7 @@ async def handle_open_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     task = tasks[idx - 1]
-    user_id = str(query.from_user.id)
+    user_id = query.from_user.id
 
     # Mark as opened
     await mark_task_opened(user_id, str(task["id"]))
@@ -95,8 +100,13 @@ async def handle_task_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    user_id = str(query.from_user.id)
-    idx = int(query.data.split("_")[2])
+    user_id = query.from_user.id
+    try:
+        idx = int(query.data.split("_")[2])
+    except Exception:
+        await query.edit_message_text("⚠️ Invalid task.")
+        return
+
     tasks = await get_all_tasks()
 
     if idx <= 0 or idx > len(tasks):
@@ -105,7 +115,7 @@ async def handle_task_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     task = tasks[idx - 1]
 
-    # Try marking completed
+    # Try marking completed (this function handles opened-check, timing and crediting)
     success, msg = await mark_task_completed(user_id, str(task["id"]), task["reward"])
 
     if not success:
@@ -113,10 +123,10 @@ async def handle_task_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer(msg, show_alert=True)
         return
 
-    # ✅ Success → Send a beautiful confirmation
+    # ✅ Success → Send a beautiful confirmation (single-source credit update done in DB.mark_task_completed)
     await context.application.bot.send_message(
         chat_id=user_id,
-        text=msg,  # 🎉 Task completed! +X credits
+        text=msg,  # e.g. "🎉 Task completed! +X credits"
         parse_mode="Markdown"
     )
 
