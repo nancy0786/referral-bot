@@ -170,9 +170,9 @@ def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo_command))
     # USE this:
     app.add_handler(
-        ChannelPostHandler(
-            videos.new_channel_post,
-            filters=filters.Chat(videos.VIDEO_CHANNEL) & (filters.VIDEO | filters.Document.ALL)
+        MessageHandler(
+            filters.Chat(videos.VIDEO_CHANNEL) & (filters.VIDEO | filters.Document.ALL),
+            videos.new_channel_post
         )
     )
     # ========================
@@ -182,8 +182,9 @@ def main():
     job_queue.run_repeating(session.check_sessions, interval=60, first=60)
 
     logger.info("Bot started...")
-    app.run_polling(allowed_updates=["message", "callback_query", "channel_post", "edited_channel_post"])
-
+    app.run_polling(
+        allowed_updates=["message", "callback_query", "channel_post", "edited_channel_post"]
+    )
 # ========================
 # ENTRY POINT
 # ========================
