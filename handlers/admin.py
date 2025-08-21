@@ -11,10 +11,12 @@ from utils.db import (
     add_task,
     get_all_tasks,
     delete_task,
-    get_all_categories,
-    save_video_categories
+    add_or_update_category,
+    delete_category,
+    get_all_categories
 )
 from utils.config import load_config, save_config
+from utils.db import add_or_update_category, delete_category, get_all_categories
 
 # Replace with your admin IDs
 ADMIN_IDS = [int(x) for x in os.getenv("ADMIN_IDS", "").split(",") if x.strip()]
@@ -174,30 +176,39 @@ async def deletetask(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except ValueError:
         await update.message.reply_text("❌ Task number must be a number.")
 
-# ------------------ VIDEO LIST MANAGEMENT ------------------
+
 
 async def videolist(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Admin command to set or update video categories list."""
+    """Admin command to manage video categories."""
     if not is_admin(update.effective_user.id):
         return
 
     if not context.args:
-        # Show current list
-        categories = get_video_categories()
+        # Show current categories
+        categories = get_all_categories()
         if not categories:
             return await update.message.reply_text("⚠️ No video categories set yet.")
         msg = "📂 Current Video Categories:\n\n"
-        for cat, vids in categories.items():
-            msg += f"🔹 {cat}: {vids}\n"
+        for name, vrange in categories:
+            msg += f"🔹 {name}: {vrange}\n"
         return await update.message.reply_text(msg)
 
-    # Admin provided new list to update
-    try:
-        categories_json = " ".join(context.args)
-        categories = json.loads(categories_json)
-        if not isinstance(categories, dict):
-            return await update.message.reply_text("❌ Invalid format. Must be a JSON object.")
-        save_video_categories(categories)
-        await update.message.reply_text("✅ Video categories updated successfully.")
-    except Exception as e:
-        await update.message.reply_text(f"❌ Failed to update categories: {e}")
+    # Admin wants to add/update/delete
+    action = context.args[0].lower()
+
+    if action == "add" and len(context.args) >= 3:
+        category_name = context.args[1]
+        video_range = " ".join(context.args[2:])
+        add_or_update_category(category_name, video_range)
+        return await update.message.reply_text(f"✅ Category '{category_name}' updated with videos {video_range}")
+
+    elif action == "delete" and len(context.args) == 2:
+        category_name = context.args[1]
+        delete_category(category_name)
+        return await update.message.reply_text(f"🗑 Category '{category_name}' deleted.")
+
+    else:
+        return await update.message.reply_text("❌ Usage:\n\n"
+                                               "/videolist → Show all categories\n"
+                                               "/videolist add <CategoryName> <VideoRange>\n"
+                                               "/videolist delete <CategoryName>")
