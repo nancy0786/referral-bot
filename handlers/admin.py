@@ -280,10 +280,11 @@ async def videolist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                                "/videolist delete <CategoryName>")
 
 
+
 # Add redeem command
 async def addredeem_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    if not is_admin(user_id):
+    if not is_admin(user_id):  # uses ENV-defined ADMIN_IDS
         return await update.message.reply_text("❌ You are not authorized.")
 
     if len(context.args) != 3:
