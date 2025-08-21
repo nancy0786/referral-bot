@@ -1,12 +1,18 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 from handlers.profile import show_profile
+from utils.checks import ensure_access
 
+async def some_command(update, context):
+    if not await ensure_access(update, context):
+        return  # stop execution until user completes requirements
+    
+    # normal command code here
 async def send_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, edit=False) -> None:
     keyboard = [
         [InlineKeyboardButton("🎥 Watch Videos", callback_data="menu_videos")],
         [InlineKeyboardButton("🏆 My Profile", callback_data="menu_profile")],
-        [InlineKeyboardButton("🎯 Tasks & Giveaways", callback_data="menu_tasks")],
+        [InlineKeyboardButton("🎯 Tasks", callback_data="menu_tasks")],
         [InlineKeyboardButton("🎁 Redeem Code", callback_data="menu_redeem")],
         [InlineKeyboardButton("💎 Upgrade Plan", callback_data="menu_upgrade")],
         [InlineKeyboardButton("❓ Help", callback_data="menu_help")],
