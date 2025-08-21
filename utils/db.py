@@ -45,6 +45,12 @@ def _path_for(user_id: int) -> str:
 
 async def get_user(user_id: int, username: Optional[str] = None) -> Dict[str, Any]:
     """Load user data asynchronously. Create new user if not exists."""
+    # normalize to int to avoid fragmented files like "123" vs 123
+    try:
+        user_id = int(user_id)
+    except Exception:
+        raise ValueError("user_id must be an integer-compatible value")
+
     path = _path_for(user_id)
 
     if not os.path.exists(path):
@@ -57,7 +63,7 @@ async def get_user(user_id: int, username: Optional[str] = None) -> Dict[str, An
     async with aiofiles.open(path, "r", encoding="utf-8") as f:
         try:
             raw = await f.read()
-            data = json.loads(raw)
+            data = json.loads(raw) if raw else dict(DEFAULT_USER)
         except Exception:
             data = dict(DEFAULT_USER)
             data["user_id"] = user_id
@@ -67,9 +73,33 @@ async def get_user(user_id: int, username: Optional[str] = None) -> Dict[str, An
     if "videos" not in data:
         data["videos"] = {"fetched": [], "watched": [], "tags": {}}
 
+    # Backfill commonly-missing fields to avoid KeyError
+    if "tasks_completed" not in data:
+        data["tasks_completed"] = []
+    if "tasks_opened" not in data:
+        data["tasks_opened"] = {}
+    if "credits" not in data:
+        data["credits"] = 0
+    if "usage" not in data:
+        data["usage"] = {"videos_watched_today": 0, "last_watch_reset": None}
+    referrals_val = data.get("referrals", {})
+    if isinstance(referrals_val, list):
+        # older format used a list for pending referrals — normalize to dict
+        data["referrals"] = {
+            "pending": referrals_val,
+            "completed": [],
+            "invited_by": None,
+            "total": 0,
+            "successful": 0
+        }
+    elif not referrals_val:
+        data["referrals"] = {"invited_by": None, "total": 0, "successful": 0, "pending": []}
+
     if username:
         data["username"] = username
 
+    # Persist backfilled structure but avoid redundant backup on read
+    await save_user(user_id, data, backup_sync=False)
     return data
 
 
@@ -78,6 +108,12 @@ async def save_user(user_id: int, data: Dict[str, Any], backup_sync: bool = True
     Save user locally and optionally sync to backup channel.
     Atomic write to prevent file corruption.
     """
+    # normalize id
+    try:
+        user_id = int(user_id)
+    except Exception:
+        raise ValueError("user_id must be an integer-compatible value")
+
     path = _path_for(user_id)
     data["user_id"] = user_id
 
@@ -96,7 +132,7 @@ async def save_user(user_id: int, data: Dict[str, Any], backup_sync: bool = True
             pass
 
     # Backup to Telegram channel (async fire-and-forget)
-    if backup_sync and config.PRIVATE_DB_CHANNEL_ID != 0:
+    if backup_sync and getattr(config, "PRIVATE_DB_CHANNEL_ID", 0) != 0:
         try:
             async def _backup():
                 await backup.update_user_backup(user_id, path)
@@ -158,7 +194,7 @@ async def add_fetched_video(user_id: int, video_id: int, tags: Optional[List[str
     await save_user(user_id, user)
 
 
-async def mark_video_watched(user_id: int, video_id: int):
+async def mark_video_watched(user_id: int, video_id: str):
     """Mark video as watched"""
     user = await get_user(user_id)
     if video_id not in user["videos"]["watched"]:
@@ -244,7 +280,7 @@ async def delete_task(index: int):
 async def mark_task_opened(user_id: int, task_id: str):
     """Mark that a user has opened a task link."""
     user = await get_user(user_id)
-    if "tasks_opened" not in user:
+    if "tasks_opened" not in user or not isinstance(user["tasks_opened"], dict):
         user["tasks_opened"] = {}
     user["tasks_opened"][task_id] = int(time.time())  # store open timestamp
     await save_user(user_id, user)
@@ -263,15 +299,18 @@ async def mark_task_completed(user_id: int, task_id: str, reward: int = 0):
     if time.time() - opened_at < 5:
         return False, "⏳ Please stay at least 5 seconds before completing."
 
-    # Prevent double credit
+    # Prevent double credit - ensure list exists
+    if "tasks_completed" not in user or not isinstance(user["tasks_completed"], list):
+        user["tasks_completed"] = []
+
     if task_id in user.get("tasks_completed", []):
         return False, "✅ You already completed this task!"
 
-    # Mark completed & add credits
+    # Mark completed & add credits (single-source here)
     user["tasks_completed"].append(task_id)
-    user["credits"] = user.get("credits", 0) + reward
+    user["credits"] = int(user.get("credits", 0)) + int(reward or 0)
     await save_user(user_id, user)
-    return True, f"🎉 Task completed! +{reward} credits"
+    return True, f"🎉 Task completed! +{int(reward or 0)} credits"
 
 # Backward compatibility for older handlers
 async def get_user_data(user_id: int):
@@ -297,14 +336,9 @@ async def get_user_data(user_id: int):
         "user_id": user.get("user_id"),
         "name": user.get("username"),
         "credits": user.get("credits", 0),
-        "plan": user.get("plan", {}).get("name", "Free"),
-        "plan_expiry": user.get("plan", {}).get("expires_at"),
-        "referrals": {
-            "total": ref_total,
-            "successful": ref_success,
-            "pending": len(referrals.get("pending", [])),
-            "completed": len(referrals.get("completed", [])),
-        },
+        "plan": user.get("plan", {}).get("name", "Free") if isinstance(user.get("plan"), dict) else user.get("plan", "Free"),
+        "plan_expiry": user.get("plan", {}).get("expires_at") if isinstance(user.get("plan"), dict) else None,
+        "referrals": referrals,
         "badges": user.get("badges", []),
         "redeemed_codes": user.get("redeemed_codes", []),
         "usage_today": user.get("usage", {}).get("videos_watched_today", 0),
@@ -327,8 +361,12 @@ async def save_user_data(user_id: int, data: dict):
         user["referrals"] = {"pending": user["referrals"], "completed": [], "invited_by": None, "total": 0, "successful": 0}
 
     user["credits"] = data.get("credits", user.get("credits", 0))
-    user["plan"]["name"] = data.get("plan", user.get("plan", {}).get("name", "Free"))
-    user["plan"]["expires_at"] = data.get("plan_expiry", user.get("plan", {}).get("expires_at"))
+    # plan may be a string or dict - keep compatibility
+    if isinstance(user.get("plan"), dict):
+        user["plan"]["name"] = data.get("plan", user.get("plan", {}).get("name", "Free"))
+        user["plan"]["expires_at"] = data.get("plan_expiry", user.get("plan", {}).get("expires_at"))
+    else:
+        user["plan"] = {"name": data.get("plan", user.get("plan", "Free")), "expires_at": data.get("plan_expiry")}
     user["referrals"] = data.get("referrals", user.get("referrals", {}))
     user["badges"] = data.get("badges", user.get("badges", []))
     user["redeemed_codes"] = data.get("redeemed_codes", user.get("redeemed_codes", []))
