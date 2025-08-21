@@ -7,7 +7,13 @@ import time
 from config import ADMIN_IDS
 import re
 from utils.db import add_fetched_video
+from utils.checks import ensure_access
 
+async def some_command(update, context):
+    if not await ensure_access(update, context):
+        return  # stop execution until user completes requirements
+    
+    # normal command code here
 # -----------------------------
 # Config
 # -----------------------------
