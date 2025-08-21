@@ -178,21 +178,36 @@ async def deletetask(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 
-async def videolist(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Admin command to manage video categories."""
-    if not is_admin(update.effective_user.id):
-        return
+async def videolist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin command: view or update video categories."""
+    user_id = update.effective_user.id
+    if not is_admin(user_id, context.bot_data.get("ADMIN_IDS", [])):
+        return await update.message.reply_text("❌ You are not authorized to use this command.")
 
     if not context.args:
-        # Show current categories
+        # Show current list
         categories = get_all_categories()
         if not categories:
-            return await update.message.reply_text("⚠️ No video categories set yet.")
+            return await update.message.reply_text("⚠️ No categories found.")
         msg = "📂 Current Video Categories:\n\n"
-        for name, vrange in categories:
-            msg += f"🔹 {name}: {vrange}\n"
+        for cat, vids in categories:
+            msg += f"🔹 {cat}: {vids}\n"
         return await update.message.reply_text(msg)
 
+    try:
+        # Admin provides JSON
+        categories_json = " ".join(context.args)
+        categories = json.loads(categories_json)
+
+        if not isinstance(categories, dict):
+            return await update.message.reply_text("❌ Invalid format. Must be a JSON object.")
+
+        for cat, vids in categories.items():
+            add_or_update_category(cat, vids)
+
+        await update.message.reply_text("✅ Video categories updated successfully.")
+    except Exception as e:
+        await update.message.reply_text(f"❌ Error: {e}")
     # Admin wants to add/update/delete
     action = context.args[0].lower()
 
