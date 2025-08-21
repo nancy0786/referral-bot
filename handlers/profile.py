@@ -2,7 +2,13 @@
 from utils.db import get_user_data
 from telegram import Update
 from telegram.ext import ContextTypes
+from utils.checks import ensure_access
 
+async def some_command(update, context):
+    if not await ensure_access(update, context):
+        return  # stop execution until user completes requirements
+    
+    # normal command code here
 async def show_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     user_data = await get_user_data(user_id) or {}  # ✅ Prevent None errors
