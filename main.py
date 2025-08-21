@@ -57,7 +57,7 @@ from utils.db import update_last_active
 from handlers.giveaways import show_giveaways, handle_giveaway_callback
 from handlers.referral import referral_command
 from handlers import videos
-
+from utils.db import update_last_active, init_video_categories_table
 
 # ========================
 # LOGGING
@@ -101,7 +101,7 @@ async def echo_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
     if not BOT_TOKEN:
         raise SystemExit("BOT_TOKEN missing in .env")
-
+    init_video_categories_table()
     app = Application.builder().token(BOT_TOKEN).build()
 
     # Save admin IDs in bot_data for use in videolist
