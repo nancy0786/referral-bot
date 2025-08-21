@@ -359,25 +359,42 @@ def init_db():
     conn.close()
 
 
-# User functions
-def get_user(user_id):
-    conn = sqlite3.connect(DB_NAME)
-    cur = conn.cursor()
-    cur.execute("SELECT * FROM users WHERE user_id=?", (user_id,))
-    row = cur.fetchone()
-    conn.close()
-    return row
+# ---------------- ASYNC SQLITE WRAPPERS ----------------
+import functools
 
+async def async_db(func, *args, **kwargs):
+    """Run blocking DB function in a separate thread"""
+    return await asyncio.to_thread(functools.partial(func, *args, **kwargs))
 
-def save_user(user_id, username, credits=0, plan_name='Free', plan_expires_at=None):
-    conn = sqlite3.connect(DB_NAME)
-    cur = conn.cursor()
-    cur.execute("""
-        INSERT OR REPLACE INTO users (user_id, username, credits, plan_name, plan_expires_at)
-        VALUES (?, ?, ?, ?, ?)
-    """, (user_id, username, credits, plan_name, plan_expires_at))
-    conn.commit()
-    conn.close()
+# Get user row as dict
+async def get_user(user_id):
+    def _get_user(user_id):
+        conn = sqlite3.connect(DB_NAME)
+        cur = conn.cursor()
+        cur.execute("SELECT user_id, username, credits, plan_name, plan_expires_at FROM users WHERE user_id=?", (user_id,))
+        row = cur.fetchone()
+        conn.close()
+        if not row:
+            return None
+        return {
+            "user_id": row[0],
+            "username": row[1],
+            "credits": row[2],
+            "plan": {"name": row[3], "expires_at": row[4]},
+        }
+    return await async_db(_get_user, user_id)
+
+async def save_user(user_id, username, credits=0, plan_name='Free', plan_expires_at=None):
+    def _save_user(user_id, username, credits, plan_name, plan_expires_at):
+        conn = sqlite3.connect(DB_NAME)
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT OR REPLACE INTO users (user_id, username, credits, plan_name, plan_expires_at)
+            VALUES (?, ?, ?, ?, ?)
+        """, (user_id, username, credits, plan_name, plan_expires_at))
+        conn.commit()
+        conn.close()
+    await async_db(_save_user, user_id, username, credits, plan_name, plan_expires_at)
 
 
 # Video category functions
