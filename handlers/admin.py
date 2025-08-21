@@ -11,8 +11,8 @@ from utils.db import (
     add_task,
     get_all_tasks,
     delete_task,
-    get_video_categories,   # ✅ new
-    save_video_categories   # ✅ new
+    get_all_categories,
+    save_video_categories
 )
 from utils.config import load_config, save_config
 
