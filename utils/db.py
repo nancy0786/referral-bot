@@ -314,153 +314,131 @@ async def mark_task_completed(user_id: int, task_id: str, reward: int = 0):
     return True, f"🎉 Task completed! +{int(reward or 0)} credits"
 
 
+
 # db.py
 
 
-DB_NAME = "bot_database.db"
 
+DB_NAME = "bot.db"
+
+# Initialize tables
 def init_db():
     conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
+    cur = conn.cursor()
+    
+    # Users table
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            user_id INTEGER PRIMARY KEY,
+            username TEXT,
+            credits INTEGER DEFAULT 0,
+            plan_name TEXT DEFAULT 'Free',
+            plan_expires_at INTEGER
+        )
+    """)
 
-    # Create video_categories table
-    cursor.execute('''CREATE TABLE IF NOT EXISTS video_categories (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        category_name TEXT UNIQUE,
-                        video_range TEXT
-                    )''')
+    # Video categories table
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS video_categories (
+            category TEXT PRIMARY KEY,
+            videos TEXT
+        )
+    """)
+
+    # Redeem codes table
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS redeem_codes (
+            code TEXT PRIMARY KEY,
+            credit_amount INTEGER,
+            duration_hours INTEGER,
+            used_by TEXT
+        )
+    """)
+
     conn.commit()
     conn.close()
 
-# ---------------------------
-# VIDEO CATEGORY FUNCTIONS
-# ---------------------------
-def add_or_update_category(category_name: str, video_range: str):
+
+# User functions
+def get_user(user_id):
     conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute('''INSERT INTO video_categories (category_name, video_range)
-                      VALUES (?, ?)
-                      ON CONFLICT(category_name) DO UPDATE SET video_range=excluded.video_range''',
-                   (category_name, video_range))
-    conn.commit()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM users WHERE user_id=?", (user_id,))
+    row = cur.fetchone()
     conn.close()
+    return row
 
-def delete_category(category_name: str):
+
+def save_user(user_id, username, credits=0, plan_name='Free', plan_expires_at=None):
     conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM video_categories WHERE category_name = ?", (category_name,))
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT OR REPLACE INTO users (user_id, username, credits, plan_name, plan_expires_at)
+        VALUES (?, ?, ?, ?, ?)
+    """, (user_id, username, credits, plan_name, plan_expires_at))
     conn.commit()
     conn.close()
 
+
+# Video category functions
 def get_all_categories():
     conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("SELECT category_name, video_range FROM video_categories ORDER BY id")
-    rows = cursor.fetchall()
+    cur = conn.cursor()
+    cur.execute("SELECT category, videos FROM video_categories")
+    rows = cur.fetchall()
     conn.close()
     return rows
 
-# Add this in db.py, inside init_db() or a separate init function
-def init_redeem_codes_table():
+
+def add_or_update_category(category, videos):
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("INSERT OR REPLACE INTO video_categories (category, videos) VALUES (?, ?)", (category, str(videos)))
+    conn.commit()
+    conn.close()
+
+
+def delete_category(category):
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("DELETE FROM video_categories WHERE category=?", (category,))
+    conn.commit()
+    conn.close()
+
+
+# Redeem code functions
+def add_redeem_code(code, credit_amount, duration_hours):
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
     cur.execute("""
-        CREATE TABLE IF NOT EXISTS redeem_codes (
-            code TEXT PRIMARY KEY,
-            credit_amount INTEGER DEFAULT 0,
-            duration_hours INTEGER DEFAULT 0,
-            used_by TEXT DEFAULT ''  -- comma-separated user_ids
-        )
-    """)
+        INSERT OR REPLACE INTO redeem_codes (code, credit_amount, duration_hours, used_by)
+        VALUES (?, ?, ?, '')
+    """, (code.upper(), credit_amount, duration_hours))
     conn.commit()
     conn.close()
 
 
-# db.py
-
-import sqlite3
-import json
-
-DB_NAME = "bot_database.db"
-
-# -----------------------------
-# REDEEM CODES FUNCTIONS
-# -----------------------------
-
-def init_redeem_table():
-    """Initialize redeem_codes table if not exists."""
+def get_redeem_code(code):
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS redeem_codes (
-            code TEXT PRIMARY KEY,
-            credit_amount INTEGER NOT NULL,
-            duration_hours INTEGER NOT NULL,
-            used_by TEXT DEFAULT '[]'
-        )
-    """)
-    conn.commit()
-    conn.close()
-
-
-def add_redeem_code(code: str, credit_amount: int, duration_hours: int):
-    """Add a new redeem code. Does not overwrite used_by history if code exists."""
-    code = code.upper()
-    conn = sqlite3.connect(DB_NAME)
-    cur = conn.cursor()
-    # Check if code exists
-    cur.execute("SELECT used_by FROM redeem_codes WHERE code = ?", (code,))
-    row = cur.fetchone()
-    if row:
-        used_by_json = row[0] or "[]"
-        cur.execute("""
-            UPDATE redeem_codes
-            SET credit_amount=?, duration_hours=?, used_by=?
-            WHERE code=?
-        """, (credit_amount, duration_hours, used_by_json, code))
-    else:
-        cur.execute("""
-            INSERT INTO redeem_codes (code, credit_amount, duration_hours)
-            VALUES (?, ?, ?)
-        """, (code, credit_amount, duration_hours))
-    conn.commit()
-    conn.close()
-
-
-def get_redeem_code(code: str):
-    """Fetch redeem code details."""
-    conn = sqlite3.connect(DB_NAME)
-    cur = conn.cursor()
-    cur.execute("SELECT code, credit_amount, duration_hours, used_by FROM redeem_codes WHERE code = ?", (code.upper(),))
+    cur.execute("SELECT code, credit_amount, duration_hours, used_by FROM redeem_codes WHERE code=?", (code.upper(),))
     row = cur.fetchone()
     conn.close()
-    if row:
-        # Convert used_by JSON string to Python list
-        code_str, credits, hours, used_by_json = row
-        used_by = json.loads(used_by_json or "[]")
-        return {
-            "code": code_str,
-            "credits": credits,
-            "duration_hours": hours,
-            "used_by": used_by
-        }
-    return None
+    return row
 
 
-def mark_code_used(code: str, user_id: int):
-    """Mark a redeem code as used by a specific user."""
-    code_data = get_redeem_code(code)
-    if not code_data:
-        return False  # code not found
-
-    used_by = code_data["used_by"]
-    if user_id in used_by:
-        return False  # user already used this code
-
-    used_by.append(user_id)
+def mark_code_used(code, user_id):
+    row = get_redeem_code(code)
+    if not row:
+        return False
+    used_by = row[3].split(",") if row[3] else []
+    if str(user_id) in used_by:
+        return False
+    used_by.append(str(user_id))
+    used_by_str = ",".join(used_by)
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
-    cur.execute("UPDATE redeem_codes SET used_by=? WHERE code=?", (json.dumps(used_by), code.upper()))
+    cur.execute("UPDATE redeem_codes SET used_by=? WHERE code=?", (used_by_str, code.upper()))
     conn.commit()
     conn.close()
     return True
