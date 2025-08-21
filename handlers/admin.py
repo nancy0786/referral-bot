@@ -236,10 +236,54 @@ async def videolist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # admin.py
 
-async def addredeem_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Admin command to create a redeem code."""
+import json
+from telegram import Update
+from telegram.ext import ContextTypes
+from utils.db import add_or_update_category, delete_category, get_all_categories, add_redeem_code
+
+ADMIN_IDS = [12345678]  # your admin Telegram user IDs
+
+
+def is_admin(user_id):
+    return user_id in ADMIN_IDS
+
+
+# Video list command
+async def videolist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    if not is_admin(user_id):  # use your is_admin check
+    if not is_admin(user_id):
+        return await update.message.reply_text("❌ You are not authorized.")
+
+    if not context.args:
+        categories = get_all_categories()
+        if not categories:
+            return await update.message.reply_text("⚠️ No categories found.")
+        msg = "📂 Current Video Categories:\n\n"
+        for cat, vids in categories:
+            msg += f"🔹 {cat}: {vids}\n"
+        return await update.message.reply_text(msg)
+
+    action = context.args[0].lower()
+    if action == "add" and len(context.args) >= 3:
+        category_name = context.args[1]
+        video_range = " ".join(context.args[2:])
+        add_or_update_category(category_name, video_range)
+        return await update.message.reply_text(f"✅ Category '{category_name}' updated with videos {video_range}")
+    elif action == "delete" and len(context.args) == 2:
+        category_name = context.args[1]
+        delete_category(category_name)
+        return await update.message.reply_text(f"🗑 Category '{category_name}' deleted.")
+    else:
+        return await update.message.reply_text("❌ Usage:\n"
+                                               "/videolist → Show all categories\n"
+                                               "/videolist add <CategoryName> <VideoRange>\n"
+                                               "/videolist delete <CategoryName>")
+
+
+# Add redeem command
+async def addredeem_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if not is_admin(user_id):
         return await update.message.reply_text("❌ You are not authorized.")
 
     if len(context.args) != 3:
