@@ -93,9 +93,17 @@ def check_and_update_expiry(user_id):
     if not user or not user.get("plan_expiry"):
         return
 
-    expiry_date = datetime.strptime(user["plan_expiry"], "%Y-%m-%d %H:%M:%S")
-    if datetime.now() > expiry_date:
-        set_plan(user_id, "free")
+    
+
+# user["plan"]["expires_at"] may be int or None
+expiry_timestamp = user.get("plan", {}).get("expires_at")
+if expiry_timestamp:
+    if isinstance(expiry_timestamp, int):
+        expiry_date = datetime.fromtimestamp(expiry_timestamp)
+    else:
+        expiry_date = datetime.strptime(expiry_timestamp, "%Y-%m-%d %H:%M:%S")
+else:
+    expiry_date = None
 
 
 def refill_free_plan_credits(user_id):
