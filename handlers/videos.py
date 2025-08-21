@@ -8,7 +8,7 @@ from config import ADMIN_IDS
 import re
 from utils.db import add_fetched_video
 from utils.checks import ensure_access   # ✅ import access check
-from utils.categories import add_or_update_category, get_all_categories   # ✅ NEW import
+from utils.db import add_or_update_category, get_all_categories
 
 
 # -----------------------------
