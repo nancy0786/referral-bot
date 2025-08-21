@@ -3,7 +3,7 @@ import os
 from datetime import datetime, timedelta
 from config import DB_FOLDER, BACKUP_CHANNEL_ID
 from backup_system import backup_user_data  # From Step 12
-from db import get_user_data, save_user_data  # ✅ Use async DB
+ 
 
 # Define all plans here
 PLANS = {
