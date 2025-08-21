@@ -3,6 +3,7 @@ import os
 import logging
 from dotenv import load_dotenv
 from telegram import Update
+from telegram.ext import ChannelPostHandler
 
 from telegram.ext import (
     Application,
@@ -167,12 +168,13 @@ def main():
     app.add_handler(MessageHandler(filters.FORWARDED, handle_forward))  # Sponsor Verification
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_redeem_text))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo_command))
+    # USE this:
     app.add_handler(
-    MessageHandler(
-        filters.Chat(videos.VIDEO_CHANNEL) & (filters.VIDEO | filters.Document.ALL),
-        videos.new_channel_post
+        ChannelPostHandler(
+            videos.new_channel_post,
+            filters=filters.Chat(videos.VIDEO_CHANNEL) & (filters.VIDEO | filters.Document.ALL)
+        )
     )
-)
     # ========================
     # BACKGROUND JOBS
     # ========================
@@ -180,7 +182,7 @@ def main():
     job_queue.run_repeating(session.check_sessions, interval=60, first=60)
 
     logger.info("Bot started...")
-    app.run_polling(allowed_updates=["message", "callback_query"])
+    app.run_polling(allowed_updates=["message", "callback_query", "channel_post", "edited_channel_post"])
 
 # ========================
 # ENTRY POINT
