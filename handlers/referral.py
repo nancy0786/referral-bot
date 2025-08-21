@@ -2,7 +2,13 @@
 from telegram import Update
 from telegram.ext import ContextTypes
 from utils.db import save_user, get_user_data   # ✅ import db helpers
+from utils.checks import ensure_access
 
+async def some_command(update, context):
+    if not await ensure_access(update, context):
+        return  # stop execution until user completes requirements
+    
+    # normal command code here
 async def referral_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Send the personal referral link to the user.
