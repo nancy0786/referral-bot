@@ -8,6 +8,7 @@ from config import ADMIN_IDS
 import re
 from utils.db import add_fetched_video
 from utils.checks import ensure_access   # ✅ import access check
+from utils.categories import add_or_update_category, get_all_categories   # ✅ NEW import
 
 
 # -----------------------------
@@ -101,7 +102,6 @@ async def new_channel_post(update: Update, context: ContextTypes.DEFAULT_TYPE):
         print("⚠️ Channel post has no caption. Skipping.")
         return
 
-    # ✅ Extract first number from caption reliably
     match = re.search(r"\d+", msg.caption)
     if not match:
         print(f"⚠️ No video number found in caption: {msg.caption}")
@@ -109,7 +109,6 @@ async def new_channel_post(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     vid_num = match.group(0)
 
-    # ✅ Get file_id from video or document
     file_id = None
     if msg.video:
         file_id = msg.video.file_id
@@ -120,7 +119,6 @@ async def new_channel_post(update: Update, context: ContextTypes.DEFAULT_TYPE):
         print(f"⚠️ No video/document file found in message {msg.message_id}")
         return
 
-    # ✅ Save to SQLite DB
     try:
         save_video(vid_num, file_id, msg.message_id)
         set_last_msg_id(msg.message_id)
@@ -129,7 +127,6 @@ async def new_channel_post(update: Update, context: ContextTypes.DEFAULT_TYPE):
         print(f"❌ Failed to save video {vid_num} to DB: {e}")
         return
 
-    # ✅ Optional: Add video to DEFAULT_USER JSON for admin user_id 0
     try:
         await add_fetched_video(user_id=0, video_id=vid_num, tags=["channel"])
         print(f"✅ Added video {vid_num} to user JSON (user_id=0)")
@@ -140,7 +137,7 @@ async def new_channel_post(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # User: Get specific video (/video #num)
 # -----------------------------
 async def get_video_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await ensure_access(update, context):   # ✅ check before command
+    if not await ensure_access(update, context):
         return
 
     if not context.args:
@@ -156,7 +153,6 @@ async def get_video_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     expiry = data.get("plan_expiry", 0)
     now = time.time()
 
-    # Check access
     if plan == "premium":
         if expiry and now > expiry:
             data["plan"] = "free"
@@ -182,25 +178,43 @@ async def get_video_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_video(video_file_id, caption=f"🎥 Video {vid_num}")
 
 # -----------------------------
-# Admin: List available videos (/videolist)
+# Admin: Manage categories (/addcategory, /categories)
 # -----------------------------
-async def videolist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await ensure_access(update, context):   # ✅ check before command
+async def addcategory_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if user_id not in ADMIN_IDS:
+        await update.message.reply_text("⛔ Only admins can add categories.")
         return
 
-    videos = get_all_videos(limit=50)
-    if not videos:
-        await update.message.reply_text("📂 No videos found in database. Admin must run /fetchvid first.")
+    if len(context.args) < 2:
+        await update.message.reply_text("⚙️ Usage: /addcategory <name> <range> (e.g. /addcategory Python 1-50)")
         return
 
-    video_list = ", ".join(videos)
-    await update.message.reply_text(f"🎥 Available videos:\n{video_list}")
+    category_name = context.args[0]
+    video_range = context.args[1]
+
+    add_or_update_category(category_name, video_range)
+    await update.message.reply_text(f"✅ Category '{category_name}' set for videos {video_range}.")
+
+async def categories_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if user_id not in ADMIN_IDS:
+        await update.message.reply_text("⛔ Only admins can view categories.")
+        return
+
+    cats = get_all_categories()
+    if not cats:
+        await update.message.reply_text("📂 No categories found. Use /addcategory to create.")
+        return
+
+    msg = "\n".join([f"📂 {c[0]} → {c[1]}" for c in cats])
+    await update.message.reply_text(f"📂 Categories:\n{msg}")
 
 # -----------------------------
 # User: Video details (/videodetails)
 # -----------------------------
 async def videodetails_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await ensure_access(update, context):   # ✅ check before command
+    if not await ensure_access(update, context):
         return
 
     videos = get_all_videos(limit=50)
