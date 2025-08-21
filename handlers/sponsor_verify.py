@@ -3,8 +3,7 @@
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
 import config
-from utils.db import get_user, save_user
-
+from utils.db import json_get_user as get_user, json_save_user as save_user, set_invited_by, add_pending_referral
 VERIFY_AWAIT_KEY = "awaiting_sponsor_verify"
 
 async def ask_sponsor_verification(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
