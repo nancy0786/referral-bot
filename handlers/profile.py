@@ -10,7 +10,13 @@ async def show_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Basic details
     name = user_data.get("name") or update.effective_user.first_name
     username = f"@{update.effective_user.username}" if update.effective_user.username else "N/A"
-    plan = user_data.get("plan", "free").capitalize()
+    plan = user_data.get("plan", "free")
+    # plan might be dict name or a string - normalize for display
+    if isinstance(plan, dict):
+        plan_name = plan.get("name", "Free")
+    else:
+        plan_name = str(plan).capitalize()
+
     credits = user_data.get("credits", 0)   # ✅ includes tasks, rewards, giveaways, redeem
     expiry = user_data.get("plan_expiry", "N/A")
     verified = "✅ Verified" if user_data.get("sponsor_verified", False) else "❌ Not Verified"
@@ -24,7 +30,14 @@ async def show_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if isinstance(referrals, dict):
         ref_total = referrals.get("total", 0)
         ref_success = referrals.get("successful", 0)
-        ref_pending = len(referrals.get("pending", []))
+
+        pending_val = referrals.get("pending", 0)
+        if isinstance(pending_val, int):
+            ref_pending = pending_val
+        elif isinstance(pending_val, list):
+            ref_pending = len(pending_val)
+        else:
+            ref_pending = 0
     else:
         # fallback for old format
         ref_total, ref_success, ref_pending = 0, 0, 0
@@ -36,8 +49,8 @@ async def show_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"• Name: {name}\n"
         f"• Username: {username}\n"
         f"• Telegram ID: `{user_id}`\n"
-        f"• Plan: {plan}\n"
-        f"• Credits (All Sources): {credits}\n"   # ✅ shows total credits
+        f"• Plan: {plan_name}\n"
+        f"• Credits (All Sources): {credits}\n"
         f"• Plan Expiry: {expiry}\n"
         f"• Sponsor Status: {verified}\n\n"
         f"📋 **Progress**\n"
