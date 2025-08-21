@@ -1,11 +1,9 @@
 # handlers/redeem.py
 import re
 import time
-import json
 from telegram import Update
 from telegram.ext import ContextTypes
 from utils.db import get_user, save_user, get_redeem_code, mark_code_used
-from utils.checks import ensure_access
 
 # -----------------------------
 # Constants
@@ -61,21 +59,43 @@ async def handle_redeem_text(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return await update.message.reply_text("⚠️ You have already used this code.")
 
     # Fetch user profile
-    profile = await get_user(user_id, username=update.effective_user.username)
+    profile_row = get_user(user_id)
+    if profile_row:
+        profile = {
+            "user_id": profile_row[0],
+            "username": profile_row[1],
+            "credits": profile_row[2],
+            "plan": profile_row[3],
+            "plan_expiry": profile_row[4] or int(time.time())
+        }
+    else:
+        profile = {
+            "user_id": user_id,
+            "username": update.effective_user.username,
+            "credits": 0,
+            "plan": "Free",
+            "plan_expiry": int(time.time())
+        }
 
     # Apply credits
-    profile["credits"] = profile.get("credits", 0) + info[1]
+    profile["credits"] += info[1]
 
     # Apply premium duration
     if info[2] > 0:
         now = int(time.time())
         expiry = max(profile.get("plan_expiry", now), now)
         expiry += info[2] * 3600  # hours -> seconds
-        profile["plan"] = "premium"
+        profile["plan"] = "Premium"
         profile["plan_expiry"] = expiry
 
     # Save user and mark code as used
-    await save_user(user_id, profile)
+    save_user(
+        user_id=profile["user_id"],
+        username=profile["username"],
+        credits=profile["credits"],
+        plan_name=profile["plan"],
+        plan_expires_at=profile["plan_expiry"]
+    )
     mark_code_used(code, user_id)
 
     # Clear await flag
