@@ -323,25 +323,19 @@ def init_db():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
 
-    # Existing tables ...
-
-    # Video Categories table
+    # Create video_categories table
     cursor.execute('''CREATE TABLE IF NOT EXISTS video_categories (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         category_name TEXT UNIQUE,
                         video_range TEXT
                     )''')
-
     conn.commit()
     conn.close()
 
-
-# =====================
+# ---------------------------
 # VIDEO CATEGORY FUNCTIONS
-# =====================
-
+# ---------------------------
 def add_or_update_category(category_name: str, video_range: str):
-    """Add a new category or update if already exists."""
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute('''INSERT INTO video_categories (category_name, video_range)
@@ -351,27 +345,20 @@ def add_or_update_category(category_name: str, video_range: str):
     conn.commit()
     conn.close()
 
-
 def delete_category(category_name: str):
-    """Delete a category by name."""
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute("DELETE FROM video_categories WHERE category_name = ?", (category_name,))
     conn.commit()
     conn.close()
 
-
 def get_all_categories():
-    """Return all categories as list of tuples (category_name, video_range)."""
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute("SELECT category_name, video_range FROM video_categories ORDER BY id")
     rows = cursor.fetchall()
     conn.close()
     return rows
-
-
-
 
 
 # Backward compatibility for older handlers
