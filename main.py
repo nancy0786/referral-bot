@@ -88,10 +88,6 @@ async def global_user_check(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ========================
 # BASIC COMMANDS
 # ========================
-async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await global_user_check(update, context)
-    await update.message.reply_text("👋 Welcome back! Your plan details are up-to-date.")
-
 async def echo_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await global_user_check(update, context)
     await update.message.reply_text("✅ Message received and plan checked.")
