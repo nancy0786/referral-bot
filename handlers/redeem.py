@@ -1,16 +1,15 @@
 # handlers/redeem.py
+import re
 import time
+import json
 from telegram import Update
 from telegram.ext import ContextTypes
-from utils.db import get_user, save_user
-from utils.codes import get_code_info, mark_code_used
+from utils.db import get_user, save_user, get_redeem_code, mark_code_used
 from utils.checks import ensure_access
 
-async def some_command(update, context):
-    if not await ensure_access(update, context):
-        return  # stop execution until user completes requirements
-    
-    # normal command code here
+# -----------------------------
+# Constants
+# -----------------------------
 AWAIT_FLAG = "awaiting_redeem_code"
 
 REDEEM_INSTRUCTIONS = (
@@ -20,71 +19,80 @@ REDEEM_INSTRUCTIONS = (
     "_Send the code now, or type /cancel._"
 )
 
+# -----------------------------
+# Start Redeem Commands
+# -----------------------------
 async def start_redeem_from_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Trigger redeem via inline menu."""
     query = update.callback_query
     context.user_data[AWAIT_FLAG] = True
     await query.answer()
     await query.edit_message_text(REDEEM_INSTRUCTIONS, parse_mode="Markdown")
 
 async def start_redeem_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Trigger redeem via /redeem command."""
     context.user_data[AWAIT_FLAG] = True
     await update.message.reply_text(REDEEM_INSTRUCTIONS, parse_mode="Markdown")
 
+# -----------------------------
+# Handle Redeem Text
+# -----------------------------
 async def handle_redeem_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handles user text ONLY when awaiting redeem code."""
+    """Handle user input for redeem code."""
     if not context.user_data.get(AWAIT_FLAG):
-        return  # ignore normal text
+        return  # normal text, not redeem code
 
     code = (update.message.text or "").strip().upper()
 
-    info = await get_code_info(code)
+    # Validate code format
+    if not re.match(r"^[A-Z0-9]{16}$", code):
+        return await update.message.reply_text(
+            "❌ Invalid code format. Must be 16 characters A–Z or 0–9."
+        )
+
+    # Fetch code info from DB
+    info = get_redeem_code(code)
     if not info:
-        await update.message.reply_text("❌ Invalid code format or code not found.\nPlease check and try again.")
-        return
+        return await update.message.reply_text("❌ Code not found or invalid.")
 
-    if info.get("used_by"):
-        await update.message.reply_text("⚠️ This code has already been used.")
-        return
-
-    # Apply reward
     user_id = update.effective_user.id
+    used_by = info[3].split(",") if info[3] else []
+    if str(user_id) in used_by:
+        return await update.message.reply_text("⚠️ You have already used this code.")
+
+    # Fetch user profile
     profile = await get_user(user_id, username=update.effective_user.username)
-    reward = info.get("reward", {})
 
-    applied_msg = None
+    # Apply credits
+    profile["credits"] = profile.get("credits", 0) + info[1]
 
-    # Credits reward
-    if "credits" in reward and isinstance(reward["credits"], int):
-        profile["credits"] = int(profile.get("credits", 0)) + int(reward["credits"])
-        applied_msg = f"✅ Redeemed! +{reward['credits']} credits added to your balance."
-
-    # Plan reward
-    plan_obj = reward.get("plan")
-    if isinstance(plan_obj, dict):
-        name = str(plan_obj.get("name", "Premium"))
-        days = int(plan_obj.get("days", 30))
+    # Apply premium duration
+    if info[2] > 0:
         now = int(time.time())
+        expiry = max(profile.get("plan_expiry", now), now)
+        expiry += info[2] * 3600  # hours -> seconds
+        profile["plan"] = "premium"
+        profile["plan_expiry"] = expiry
 
-        # If existing plan not expired, extend; else set new expiry from now
-        current = profile.get("plan", {"name": "Free", "expires_at": None})
-        expires_at = current.get("expires_at")
-        base_time = now if not expires_at or expires_at < now else int(expires_at)
-        new_expiry = base_time + days * 24 * 60 * 60
-
-        profile["plan"] = {"name": name, "expires_at": new_expiry}
-
-        human_days = "day" if days == 1 else "days"
-        plan_line = f"✅ Plan activated: {name} for {days} {human_days}."
-        applied_msg = f"{applied_msg+'\n' if applied_msg else ''}{plan_line}"
-
-    if not applied_msg:
-        await update.message.reply_text("❌ This code has no valid reward attached. Contact support.")
-        return
-
-    # Save user and mark code used
+    # Save user and mark code as used
     await save_user(user_id, profile)
-    await mark_code_used(code, user_id)
+    mark_code_used(code, user_id)
 
-    # Done
+    # Clear await flag
     context.user_data[AWAIT_FLAG] = False
-    await update.message.reply_text(applied_msg)
+
+    # Success message
+    await update.message.reply_text(
+        f"🎉 Redeemed successfully!\n"
+        f"✅ Credits: +{info[1]}\n"
+        f"✅ Premium: +{info[2]} hour(s)"
+    )
+
+# -----------------------------
+# Optional: /cancel command for users
+# -----------------------------
+async def cancel_redeem(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Cancel redeem process."""
+    if context.user_data.get(AWAIT_FLAG):
+        context.user_data[AWAIT_FLAG] = False
+        await update.message.reply_text("❌ Redeem process cancelled.")
