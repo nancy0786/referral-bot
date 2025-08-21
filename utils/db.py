@@ -5,6 +5,7 @@ import json
 import aiofiles
 import asyncio
 import tempfile
+import functools
 from typing import Dict, Any, Optional, List
 import config
 from . import backup  # backup.update_user_backup
@@ -314,14 +315,12 @@ async def mark_task_completed(user_id: int, task_id: str, reward: int = 0):
     return True, f"🎉 Task completed! +{int(reward or 0)} credits"
 
 
-
 # db.py
-
 
 
 DB_NAME = "bot.db"
 
-# Initialize tables
+# ------------------ DB INIT ------------------
 def init_db():
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
@@ -358,17 +357,15 @@ def init_db():
     conn.commit()
     conn.close()
 
-
-# ---------------- ASYNC SQLITE WRAPPERS ----------------
-import functools
-
+# ------------------ ASYNC WRAPPER ------------------
 async def async_db(func, *args, **kwargs):
     """Run blocking DB function in a separate thread"""
     return await asyncio.to_thread(functools.partial(func, *args, **kwargs))
 
-# Get user row as dict
-async def get_user(user_id):
-    def _get_user(user_id):
+# ------------------ USER FUNCTIONS ------------------
+async def get_user(user_id: int) -> dict:
+    """Return user data as dictionary. Async safe."""
+    def _get_user_sync(user_id):
         conn = sqlite3.connect(DB_NAME)
         cur = conn.cursor()
         cur.execute("SELECT user_id, username, credits, plan_name, plan_expires_at FROM users WHERE user_id=?", (user_id,))
@@ -381,11 +378,21 @@ async def get_user(user_id):
             "username": row[1],
             "credits": row[2],
             "plan": {"name": row[3], "expires_at": row[4]},
+            "referrals": {"pending": [], "completed": [], "invited_by": None, "total": 0, "successful": 0},
+            "badges": [],
+            "redeemed_codes": [],
+            "usage": {"videos_watched_today": 0, "last_watch_reset": None},
+            "sponsor_verified": False,
+            "last_active": 0,
+            "active_messages": [],
+            "tasks_completed": [],
+            "ref_link": None,
+            "videos": {"fetched": [], "watched": [], "tags": {}}
         }
-    return await async_db(_get_user, user_id)
+    return await async_db(_get_user_sync, user_id)
 
-async def save_user(user_id, username, credits=0, plan_name='Free', plan_expires_at=None):
-    def _save_user(user_id, username, credits, plan_name, plan_expires_at):
+async def save_user(user_id: int, username: str, credits=0, plan_name='Free', plan_expires_at=None):
+    def _save_user_sync(user_id, username, credits, plan_name, plan_expires_at):
         conn = sqlite3.connect(DB_NAME)
         cur = conn.cursor()
         cur.execute("""
@@ -394,10 +401,9 @@ async def save_user(user_id, username, credits=0, plan_name='Free', plan_expires
         """, (user_id, username, credits, plan_name, plan_expires_at))
         conn.commit()
         conn.close()
-    await async_db(_save_user, user_id, username, credits, plan_name, plan_expires_at)
+    await async_db(_save_user_sync, user_id, username, credits, plan_name, plan_expires_at)
 
-
-# Video category functions
+# ------------------ VIDEO CATEGORY FUNCTIONS ------------------
 def get_all_categories():
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
@@ -406,14 +412,12 @@ def get_all_categories():
     conn.close()
     return rows
 
-
 def add_or_update_category(category, videos):
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
     cur.execute("INSERT OR REPLACE INTO video_categories (category, videos) VALUES (?, ?)", (category, str(videos)))
     conn.commit()
     conn.close()
-
 
 def delete_category(category):
     conn = sqlite3.connect(DB_NAME)
@@ -422,8 +426,7 @@ def delete_category(category):
     conn.commit()
     conn.close()
 
-
-# Redeem code functions
+# ------------------ REDEEM CODE FUNCTIONS ------------------
 def add_redeem_code(code, credit_amount, duration_hours):
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
@@ -434,7 +437,6 @@ def add_redeem_code(code, credit_amount, duration_hours):
     conn.commit()
     conn.close()
 
-
 def get_redeem_code(code):
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
@@ -442,7 +444,6 @@ def get_redeem_code(code):
     row = cur.fetchone()
     conn.close()
     return row
-
 
 def mark_code_used(code, user_id):
     row = get_redeem_code(code)
@@ -460,15 +461,15 @@ def mark_code_used(code, user_id):
     conn.close()
     return True
 
-
-# Backward compatibility for older handlers
+# ------------------ BACKWARD COMPATIBILITY ------------------
 async def get_user_data(user_id: int):
-    """Return user data in old-style dict format for legacy handlers."""
+    """Return user data in legacy dict format."""
     user = await get_user(user_id)
+    if not user:
+        return dict()  # fallback if user not found
 
-    # ✅ Fix for old DB files where referrals could be a list
     referrals = user.get("referrals", {})
-    if isinstance(referrals, list):  # old format safeguard
+    if isinstance(referrals, list):
         referrals = {
             "pending": referrals,
             "completed": [],
@@ -476,10 +477,6 @@ async def get_user_data(user_id: int):
             "total": 0,
             "successful": 0
         }
-
-    # ✅ Build a proper referral summary
-    ref_total = referrals.get("total", len(referrals.get("pending", [])) + len(referrals.get("completed", [])))
-    ref_success = referrals.get("successful", len(referrals.get("completed", [])))
 
     return {
         "user_id": user.get("user_id"),
@@ -496,21 +493,19 @@ async def get_user_data(user_id: int):
         "last_active": user.get("last_active", 0),
         "active_messages": user.get("active_messages", []),
         "ref_link": user.get("ref_link"),
-        # 🆕 Add tasks info for profile
         "tasks_completed": user.get("tasks_completed", []),
     }
 
-
 async def save_user_data(user_id: int, data: dict):
-    """Save user data in old-style format for legacy handlers."""
+    """Save user data for legacy handlers."""
     user = await get_user(user_id)
+    if not user:
+        return
 
-    # ✅ Fix for old DB files where referrals could be a list
     if isinstance(user.get("referrals"), list):
         user["referrals"] = {"pending": user["referrals"], "completed": [], "invited_by": None, "total": 0, "successful": 0}
 
     user["credits"] = data.get("credits", user.get("credits", 0))
-    # plan may be a string or dict - keep compatibility
     if isinstance(user.get("plan"), dict):
         user["plan"]["name"] = data.get("plan", user.get("plan", {}).get("name", "Free"))
         user["plan"]["expires_at"] = data.get("plan_expiry", user.get("plan", {}).get("expires_at"))
@@ -526,4 +521,4 @@ async def save_user_data(user_id: int, data: dict):
     user["active_messages"] = data.get("active_messages", user.get("active_messages", []))
     user["tasks_completed"] = data.get("tasks_completed", user.get("tasks_completed", []))
 
-    await save_user(user_id, user)
+    await save_user(user_id, user["username"], user["credits"], user["plan"]["name"], user["plan"]["expires_at"])
