@@ -360,6 +360,60 @@ def get_all_categories():
     conn.close()
     return rows
 
+# Add this in db.py, inside init_db() or a separate init function
+def init_redeem_codes_table():
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS redeem_codes (
+            code TEXT PRIMARY KEY,
+            credit_amount INTEGER DEFAULT 0,
+            duration_hours INTEGER DEFAULT 0,
+            used_by TEXT DEFAULT ''  -- comma-separated user_ids
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+
+# db.py
+
+def add_redeem_code(code: str, credit_amount: int, duration_hours: int):
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT OR REPLACE INTO redeem_codes (code, credit_amount, duration_hours)
+        VALUES (?, ?, ?)
+    """, (code.upper(), credit_amount, duration_hours))
+    conn.commit()
+    conn.close()
+
+
+def get_redeem_code(code: str):
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("SELECT code, credit_amount, duration_hours, used_by FROM redeem_codes WHERE code = ?", (code.upper(),))
+    row = cur.fetchone()
+    conn.close()
+    return row  # tuple or None
+
+
+def mark_code_used(code: str, user_id: int):
+    row = get_redeem_code(code)
+    if not row:
+        return False
+    used_by = row[3].split(",") if row[3] else []
+    if str(user_id) in used_by:
+        return False
+    used_by.append(str(user_id))
+    used_by_str = ",".join(used_by)
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("UPDATE redeem_codes SET used_by=? WHERE code=?", (used_by_str, code.upper()))
+    conn.commit()
+    conn.close()
+    return True
+
 
 # Backward compatibility for older handlers
 async def get_user_data(user_id: int):
