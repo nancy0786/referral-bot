@@ -11,6 +11,13 @@ from utils.db import (
 )
 
 logger = logging.getLogger(__name__)
+from utils.checks import ensure_access
+
+async def some_command(update, context):
+    if not await ensure_access(update, context):
+        return  # stop execution until user completes requirements
+    
+    # normal command code here
 
 # ========================
 # USER COMMAND: /tasks
