@@ -5,6 +5,8 @@ from utils.db import get_user_data, save_user_data
 import sqlite3
 import time
 from config import ADMIN_IDS
+import re
+from utils.db import add_fetched_video
 
 # -----------------------------
 # Config
@@ -87,32 +89,50 @@ async def fetch_videos(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "⚠️ Old videos cannot be fetched due to Telegram Bot API limitations."
     )
 
+
 # -----------------------------
 # Auto-fetch new channel videos
 # -----------------------------
 async def new_channel_post(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.channel_post
     if not msg.caption:
+        print("⚠️ Channel post has no caption. Skipping.")
         return
 
-    vid_num = None
-    for part in msg.caption.split():
-        if part.isdigit():
-            vid_num = part
-            break
-    if not vid_num:
+    # ✅ Extract first number from caption reliably
+    match = re.search(r"\d+", msg.caption)
+    if not match:
+        print(f"⚠️ No video number found in caption: {msg.caption}")
         return
 
+    vid_num = match.group(0)
+
+    # ✅ Get file_id from video or document
     file_id = None
     if msg.video:
         file_id = msg.video.file_id
     elif msg.document:
         file_id = msg.document.file_id
 
-    if file_id:
+    if not file_id:
+        print(f"⚠️ No video/document file found in message {msg.message_id}")
+        return
+
+    # ✅ Save to SQLite DB
+    try:
         save_video(vid_num, file_id, msg.message_id)
         set_last_msg_id(msg.message_id)
-        print(f"✅ Saved video {vid_num} from channel!")
+        print(f"✅ Saved video {vid_num} (msg_id {msg.message_id}) to DB")
+    except Exception as e:
+        print(f"❌ Failed to save video {vid_num} to DB: {e}")
+        return
+
+    # ✅ Optional: Add video to DEFAULT_USER JSON for admin user_id 0
+    try:
+        await add_fetched_video(user_id=0, video_id=vid_num, tags=["channel"])
+        print(f"✅ Added video {vid_num} to user JSON (user_id=0)")
+    except Exception as e:
+        print(f"❌ Failed to add video {vid_num} to JSON: {e}")
 
 # -----------------------------
 # User: Get specific video (/video #num)
