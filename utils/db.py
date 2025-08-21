@@ -363,7 +363,7 @@ async def async_db(func, *args, **kwargs):
     return await asyncio.to_thread(functools.partial(func, *args, **kwargs))
 
 # ------------------ USER FUNCTIONS ------------------
-async def get_user(user_id: int) -> dict:
+async def json_get_user(user_id: int) -> dict:
     """Return user data as dictionary. Async safe."""
     def _get_user_sync(user_id):
         conn = sqlite3.connect(DB_NAME)
@@ -391,7 +391,7 @@ async def get_user(user_id: int) -> dict:
         }
     return await async_db(_get_user_sync, user_id)
 
-async def save_user(user_id: int, username: str, credits=0, plan_name='Free', plan_expires_at=None):
+async def json_save_user(user_id: int, username: str, credits=0, plan_name='Free', plan_expires_at=None):
     def _save_user_sync(user_id, username, credits, plan_name, plan_expires_at):
         conn = sqlite3.connect(DB_NAME)
         cur = conn.cursor()
