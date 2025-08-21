@@ -104,29 +104,19 @@ async def handle_task_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     task = tasks[idx - 1]
-    user = await get_user(user_id)
 
-    # Already completed?
-    if str(task["id"]) in user.get("tasks_completed", []):
-        await query.answer("✅ You already completed this task!", show_alert=True)
+    # Try marking completed
+    success, msg = await mark_task_completed(user_id, str(task["id"]), task["reward"])
+
+    if not success:
+        # Show alert if failed (not opened, too fast, already completed)
+        await query.answer(msg, show_alert=True)
         return
 
-    # Must have opened link first
-    if str(task["id"]) not in user.get("tasks_opened", []):
-        await query.answer("❌ Please open the task link first!", show_alert=True)
-        return
-
-    # Mark task as completed
-    await mark_task_completed(user_id, str(task["id"]))
-
-    # Add credits safely
-    user["credits"] = user.get("credits", 0) + task["reward"]
-    await save_user(user_id, user)
-
-    # Notify user
+    # ✅ Success → Send a beautiful confirmation
     await context.application.bot.send_message(
         chat_id=user_id,
-        text=f"🎉 Task *{task['title']}* completed! +{task['reward']} credits",
+        text=msg,  # 🎉 Task completed! +X credits
         parse_mode="Markdown"
     )
 
