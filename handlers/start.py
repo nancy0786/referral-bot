@@ -77,7 +77,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     ref_code = None
 
     # Load or create user profile
-    profile = await get_user(user_id, username=username)
+    profile = await get_user(user_id)
 
     # --------------------------------------------------------
     # Handle referral from /start <ref_id>
