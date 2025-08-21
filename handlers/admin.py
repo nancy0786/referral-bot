@@ -176,38 +176,23 @@ async def deletetask(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except ValueError:
         await update.message.reply_text("❌ Task number must be a number.")
 
-
-
 async def videolist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Admin command: view or update video categories."""
     user_id = update.effective_user.id
-    if not is_admin(user_id, context.bot_data.get("ADMIN_IDS", [])):
+    if not is_admin(user_id):
         return await update.message.reply_text("❌ You are not authorized to use this command.")
 
     if not context.args:
-        # Show current list
+        # Show current categories
         categories = get_all_categories()
         if not categories:
             return await update.message.reply_text("⚠️ No categories found.")
+
         msg = "📂 Current Video Categories:\n\n"
         for cat, vids in categories:
             msg += f"🔹 {cat}: {vids}\n"
         return await update.message.reply_text(msg)
 
-    try:
-        # Admin provides JSON
-        categories_json = " ".join(context.args)
-        categories = json.loads(categories_json)
-
-        if not isinstance(categories, dict):
-            return await update.message.reply_text("❌ Invalid format. Must be a JSON object.")
-
-        for cat, vids in categories.items():
-            add_or_update_category(cat, vids)
-
-        await update.message.reply_text("✅ Video categories updated successfully.")
-    except Exception as e:
-        await update.message.reply_text(f"❌ Error: {e}")
     # Admin wants to add/update/delete
     action = context.args[0].lower()
 
@@ -222,8 +207,27 @@ async def videolist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         delete_category(category_name)
         return await update.message.reply_text(f"🗑 Category '{category_name}' deleted.")
 
+    elif action == "json":
+        # Admin provides full JSON to update multiple categories at once
+        try:
+            categories_json = " ".join(context.args[1:])
+            categories = json.loads(categories_json)
+
+            if not isinstance(categories, dict):
+                return await update.message.reply_text("❌ Invalid format. Must be a JSON object.")
+
+            for cat, vids in categories.items():
+                add_or_update_category(cat, vids)
+
+            return await update.message.reply_text("✅ Video categories updated successfully.")
+        except Exception as e:
+            return await update.message.reply_text(f"❌ Error: {e}")
+
     else:
-        return await update.message.reply_text("❌ Usage:\n\n"
-                                               "/videolist → Show all categories\n"
-                                               "/videolist add <CategoryName> <VideoRange>\n"
-                                               "/videolist delete <CategoryName>")
+        return await update.message.reply_text(
+            "❌ Usage:\n\n"
+            "/videolist → Show all categories\n"
+            "/videolist add <CategoryName> <VideoRange>\n"
+            "/videolist delete <CategoryName>\n"
+            "/videolist json <JSON_OBJECT>"
+        )
