@@ -4,7 +4,13 @@ from telegram import Update
 from telegram.ext import ContextTypes
 from utils.db import get_user, save_user
 from utils.codes import get_code_info, mark_code_used
+from utils.checks import ensure_access
 
+async def some_command(update, context):
+    if not await ensure_access(update, context):
+        return  # stop execution until user completes requirements
+    
+    # normal command code here
 AWAIT_FLAG = "awaiting_redeem_code"
 
 REDEEM_INSTRUCTIONS = (
