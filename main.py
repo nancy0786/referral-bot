@@ -61,7 +61,7 @@ from handlers.admin import videolist_command   # ✅ admin side
 from handlers.admin import addredeem_command
 
 from handlers.sponsor_verify import verify_code
-
+from handlers.sponsor_verify import verify_code   # ✅ Only for /verify command
 
 # ========================
 # LOGGING
