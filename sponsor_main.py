@@ -7,7 +7,7 @@ from handlers.sponsor_verify import getcode
 from utils.db import init_db
 
 async def main():
-    await init_db()  # init database if needed
+    init_db()  # init database if needed
     app = Application.builder().token(config.SPONSOR_BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("getcode", getcode))
