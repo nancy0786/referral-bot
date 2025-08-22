@@ -17,7 +17,7 @@ async def ensure_access(update, context):
     # 2. Sponsor Verification
     profile = await get_user(user_id)
     if not profile.get("sponsor_verified", False):
-        verified = await auto_verify_sponsor(user_id, context)
+        verified = await auto_verify_sponsor(update, context)
         if not verified:
             await ask_sponsor_verification(update, context)
             return False
