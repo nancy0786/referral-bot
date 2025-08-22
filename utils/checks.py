@@ -1,7 +1,7 @@
 # utils/checks.py
 
 from handlers.force_join import is_member, prompt_join
-from handlers.sponsor_verify import auto_verify_sponsor, ask_sponsor_verification
+from handlers.sponsor_verify import ask_sponsor_verification
 from utils.db import get_user, save_user
 
 async def ensure_access(update, context):
@@ -14,14 +14,11 @@ async def ensure_access(update, context):
         await prompt_join(update, context)
         return False
 
-    # 2. Sponsor Verification
+    # 2. Sponsor Verification (code system only)
     profile = await get_user(user_id)
     if not profile.get("sponsor_verified", False):
-        verified = await auto_verify_sponsor(update, context)
-        if not verified:
-            await ask_sponsor_verification(update, context)
-            return False
-        profile["sponsor_verified"] = True
-        await save_user(user_id, profile)
+        # User hasn’t verified yet → show instructions
+        await ask_sponsor_verification(update, context)
+        return False
 
     return True
