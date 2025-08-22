@@ -161,7 +161,6 @@ def main():
     # ========================
     # MESSAGE HANDLERS
     # ========================
-    app.add_handler(MessageHandler(filters.FORWARDED, handle_forward))  # Sponsor Verification
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_redeem_text))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo_command))
     # USE this:
