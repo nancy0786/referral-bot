@@ -1,7 +1,7 @@
 # utils/checks.py
 
 from handlers.force_join import is_member, prompt_join
-from handlers.sponsor_verify import ask_sponsor_verification
+from handlers.sponsor_verify import auto_verify_sponsor
 from utils.db import get_user, save_user
 
 async def ensure_access(update, context):
