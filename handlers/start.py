@@ -6,7 +6,7 @@ import config
 from telegram import Update
 from telegram.ext import ContextTypes
 from handlers.force_join import is_member, prompt_join
-from handlers.sponsor_verify import ask_sponsor_verification, auto_verify_sponsor
+from handlers.sponsor_verify import ask_sponsor_verification
 from handlers.menu import send_main_menu
 from utils.db import json_get_user as get_user, json_save_user as save_user, set_invited_by, add_pending_referral
 
@@ -102,34 +102,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     # --------------------------------------------------------
-    # Sponsor Verification Check
+    # Sponsor Verification Check (Code System)
     # --------------------------------------------------------
     if not profile.get("sponsor_verified", False):
-        verified = await auto_verify_sponsor(user_id, context)
-        if verified:
-            profile["sponsor_verified"] = True
-            await save_user(user_id, profile)
-
-            # ✅ Referral completion & credits
-            if profile["referrals"].get("invited_by"):
-                ref_id = profile["referrals"]["invited_by"]
-                ref_profile = await get_user(ref_id)
-
-                if ref_profile and user_id in ref_profile.get("referrals", {}).get("pending", []):
-                    ref_profile["referrals"]["pending"].remove(user_id)
-                    ref_profile.setdefault("referrals", {}).setdefault("completed", []).append(user_id)
-
-                    # Add credits
-                    ref_profile["credits"] = ref_profile.get("credits", 0) + REFERRAL_CREDIT
-
-                    # Badge system
-                    total_refs = len(ref_profile["referrals"].get("completed", []))
-                    if total_refs in BADGE_LEVELS:
-                        badge = BADGE_LEVELS[total_refs]
-                        if badge not in ref_profile.get("badges", []):
-                            ref_profile.setdefault("badges", []).append(badge)
-
-                    await save_user(ref_id, ref_profile)
+        await ask_sponsor_verification(update, context)
+        await log_new_user(context, user, ref_code)
+        return
 
     # --------------------------------------------------------
     # Send Main Menu
