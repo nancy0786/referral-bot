@@ -59,6 +59,7 @@ from handlers import videos
 from utils.db import update_last_active, init_db
 from handlers.admin import videolist_command   # ✅ admin side
 from handlers.admin import addredeem_command
+from handlers.sponsor_verify import verify_with_code
 
 # ========================
 # LOGGING
@@ -117,7 +118,7 @@ def main():
     app.add_handler(CommandHandler("profile", show_profile))
     app.add_handler(CommandHandler("giveaways", show_giveaways))
     app.add_handler(CommandHandler("referral", referral_command))
-
+    app.add_handler(CommandHandler("verify", verify_with_code))
     # ========================
     # ADMIN COMMANDS
     # ========================
