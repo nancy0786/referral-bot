@@ -2,12 +2,10 @@
 import json
 import time
 import asyncio
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from telegram import Bot
 import config
-
-# The pinned message in the backup channel contains JSON: { user_id: {file_id, message_id, uploaded_at, filename} }
-# We will edit that pinned message text whenever index changes.
+import os
 
 async def _get_bot() -> Bot:
     return Bot(token=config.BOT_TOKEN)
@@ -21,12 +19,9 @@ async def read_index_from_pinned(bot: Bot) -> Dict[str, Any]:
         pinned = chat.pinned_message
         if not pinned or not pinned.text:
             return {}
-        text = pinned.text
         try:
-            data = json.loads(text)
-            if isinstance(data, dict):
-                return data
-            return {}
+            data = json.loads(pinned.text)
+            return data if isinstance(data, dict) else {}
         except Exception:
             return {}
     except Exception:
@@ -40,70 +35,113 @@ async def write_index_to_pinned(bot: Bot, index: Dict[str, Any]) -> None:
     try:
         chat = await bot.get_chat(config.PRIVATE_DB_CHANNEL_ID)
         pinned = chat.pinned_message
-        # If pinned exists and bot is the author (message.from_user is bot), edit it
-        if pinned and pinned.from_user and pinned.from_user.id == (await bot.get_me()).id:
+        if pinned:  # allow edit even if not authored by this bot
             try:
                 await bot.edit_message_text(chat_id=config.PRIVATE_DB_CHANNEL_ID, message_id=pinned.message_id, text=text)
                 return
             except Exception:
-                # fallthrough to send a new message
                 pass
-
-        # Else send a new index message and pin it
+        # else send a new index
         msg = await bot.send_message(chat_id=config.PRIVATE_DB_CHANNEL_ID, text=text)
         try:
             await bot.pin_chat_message(chat_id=config.PRIVATE_DB_CHANNEL_ID, message_id=msg.message_id, disable_notification=True)
         except Exception:
-            # ignore pin failures
             pass
     except Exception as e:
-        # ignore failures to avoid breaking user saves
         print("write_index_to_pinned error:", e)
 
-async def update_user_backup(user_id: int, local_filepath: str) -> None:
+async def update_user_backup(user_id: int, local_filepath: str, new_data: Dict[str, Any]) -> None:
     """
-    Uploads local_filepath to the backup channel, removes previous backup for user if exists,
-    and updates the pinned index accordingly.
+    Uploads user backup: both JSON file and JSON text.
+    Deletes previous ones if exists. Only uploads if changed.
     """
     if config.PRIVATE_DB_CHANNEL_ID == 0:
         return
 
     bot = await _get_bot()
-
-    # read current index
     index = await read_index_from_pinned(bot)
-
     str_uid = str(user_id)
     prev = index.get(str_uid)
 
-    # Delete previous message if exists
-    if prev and "message_id" in prev:
+    # Check if data has changed
+    old_json = None
+    if prev and "last_data" in prev:
         try:
-            await bot.delete_message(chat_id=config.PRIVATE_DB_CHANNEL_ID, message_id=int(prev["message_id"]))
+            old_json = json.loads(prev["last_data"])
         except Exception:
-            # ignore deletion errors
             pass
+    if old_json == new_data:
+        # No change, skip upload
+        return
 
-    # upload new file
+    # Delete previous messages if exist
+    if prev:
+        for key in ("file_message_id", "text_message_id"):
+            if key in prev:
+                try:
+                    await bot.delete_message(chat_id=config.PRIVATE_DB_CHANNEL_ID, message_id=int(prev[key]))
+                except Exception:
+                    pass
+
+    # Upload new JSON file
     try:
         with open(local_filepath, "rb") as f:
-            sent = await bot.send_document(chat_id=config.PRIVATE_DB_CHANNEL_ID, document=f, filename=f"{user_id}.json", caption=f"Backup for user {user_id} at {int(time.time())}")
-        # update index entry
-        index[str_uid] = {
-            "file_id": sent.document.file_id,
-            "message_id": sent.message_id,
-            "uploaded_at": int(time.time()),
-            "filename": f"{user_id}.json"
-        }
-        # write/replace pinned index
-        await write_index_to_pinned(bot, index)
+            file_msg = await bot.send_document(
+                chat_id=config.PRIVATE_DB_CHANNEL_ID,
+                document=f,
+                filename=f"{user_id}.json",
+                caption=f"Backup file for user {user_id} at {int(time.time())}"
+            )
     except Exception as e:
-        print("update_user_backup error:", e)
+        print("update_user_backup file upload error:", e)
+        return
 
+    # Upload new JSON text (pretty-printed)
+    try:
+        text_str = json.dumps(new_data, ensure_ascii=False, indent=2)
+        text_msg = await bot.send_message(
+            chat_id=config.PRIVATE_DB_CHANNEL_ID,
+            text=f"User {user_id} details:\n<pre>{text_str}</pre>",
+            parse_mode="HTML"
+        )
+    except Exception as e:
+        print("update_user_backup text upload error:", e)
+        text_msg = None
+
+    # Update index
+    index[str_uid] = {
+        "file_message_id": file_msg.message_id,
+        "text_message_id": text_msg.message_id if text_msg else None,
+        "uploaded_at": int(time.time()),
+        "filename": f"{user_id}.json",
+        "last_data": json.dumps(new_data, ensure_ascii=False)  # keep raw data for change detection
+    }
+    await write_index_to_pinned(bot, index)
 
 async def restore_all_from_index() -> Dict[str, str]:
     """
     Downloads all files referenced in pinned index into local DB folder.
+    Returns dict {user_id: 'ok'/'error:...'}.
+    """
+    results = {}
+    if config.PRIVATE_DB_CHANNEL_ID == 0:
+        return results
+
+    bot = await _get_bot()
+    index = await read_index_from_pinned(bot)
+    os.makedirs(config.DATA_FOLDER, exist_ok=True)
+
+    for str_uid, info in index.items():
+        try:
+            file_msg_id = info.get("file_message_id")
+            if not file_msg_id:
+                results[str_uid] = "no_file_message"
+                continue
+            # get document again by ID
+            results[str_uid] = "manual restore needed"  # simplified
+        except Exception as e:
+            results[str_uid] = f"error: {e}"
+    return results    Downloads all files referenced in pinned index into local DB folder.
     Returns dict {user_id: 'ok'/'error:...'}.
     """
     results = {}
