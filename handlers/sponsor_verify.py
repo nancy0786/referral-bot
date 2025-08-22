@@ -1,65 +1,55 @@
 # handlers/sponsor_verify.py
 
-from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
+import random
+import string
+from telegram import Update
 from telegram.ext import ContextTypes
-import config
-from utils.db import json_get_user as get_user, json_save_user as save_user
+from utils.db import get_user, save_user
 
-VERIFY_AWAIT_KEY = "awaiting_sponsor_verify"
+def generate_code(length=6):
+    """Generate random sponsor verification code."""
+    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=length))
 
-# ---------------------------
-# Step 1: Ask user to verify
-# ---------------------------
-async def ask_sponsor_verification(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """
-    Ask user to verify with Sponsor Bot.
-    Shows a button linking to the Sponsor Bot where they can request their code.
-    """
-    context.user_data[VERIFY_AWAIT_KEY] = True
-
-    kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔗 Verify with Sponsor Bot", url=f"https://t.me/{config.SPONSOR_BOT_USERNAME.lstrip('@')}?start=getcode")]
-    ])
-
-    msg = (
-        "📢 **Sponsor Verification Required**\n\n"
-        f"Click the button below to talk to our sponsor bot {config.SPONSOR_BOT_USERNAME}.\n\n"
-        "➡️ Type `/getcode` in the sponsor bot.\n"
-        "➡️ It will give you a unique verification code.\n"
-        "➡️ Come back here and send `/verify CODE` to complete verification.\n\n"
-        "Once verified, you will get full access!"
-    )
-
-    await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=kb)
-
-
-# ---------------------------
-# Step 2: Verify with code
-# ---------------------------
-async def verify_with_code(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """
-    User runs /verify CODE in the main bot.
-    Checks against sponsor bot DB and marks user verified.
-    """
+async def getcode(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler for /getcode in Sponsor Bot."""
     user = update.effective_user
     user_id = user.id
 
+    profile = await get_user(user_id)
+    if profile is None:
+        profile = {
+            "id": user_id,
+            "username": user.username,
+            "sponsor_verified": False,
+            "sponsor_code": None
+        }
+
+    # generate a fresh code
+    code = generate_code()
+    profile["sponsor_code"] = code
+    await save_user(user_id, profile)
+
+    await update.message.reply_text(
+        f"✅ Here is your sponsor verification code:\n\n"
+        f"`{code}`\n\n"
+        "👉 Now send this code to the main bot using `/verify <code>`",
+        parse_mode="Markdown"
+    )
+
+async def verify_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler for /verify in Main Bot (checks code saved by Sponsor Bot)."""
+    user = update.effective_user
+    user_id = user.id
+    profile = await get_user(user_id)
+
     if not context.args:
-        await update.message.reply_text("⚠️ Usage: /verify CODE")
+        await update.message.reply_text("⚠️ Usage: `/verify CODE`", parse_mode="Markdown")
         return
 
-    code = context.args[0].strip()
-
-    # Load sponsor profile (same DB)
-    sponsor_profile = await get_user(user_id)
-
-    if sponsor_profile and sponsor_profile.get("verify_code") == code:
-        sponsor_profile["sponsor_verified"] = True
-        await save_user(user_id, sponsor_profile)
-
-        await update.message.reply_text(
-            "✅ Congratulations! You are now sponsor verified.\n"
-            "🎉 You now have full access to tasks, rewards and commands!"
-        )
+    code_entered = context.args[0]
+    if profile and profile.get("sponsor_code") == code_entered:
+        profile["sponsor_verified"] = True
+        await save_user(user_id, profile)
+        await update.message.reply_text("🎉 Verification successful! You are now sponsor verified.")
     else:
-        await update.message.reply_text("❌ Invalid or expired code. Please try again.")
+        await update.message.reply_text("❌ Invalid code. Please try again.")
