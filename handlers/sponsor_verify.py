@@ -46,9 +46,12 @@ async def verify_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠️ Usage: `/verify CODE`", parse_mode="Markdown")
         return
 
-    code_entered = context.args[0]
+    # normalize user input
+    code_entered = context.args[0].strip().upper()
+
     if profile and profile.get("sponsor_code") == code_entered:
         profile["sponsor_verified"] = True
+        profile["sponsor_code"] = None   # 🔑 clear the code after use
         await save_user(user_id, profile)
         await update.message.reply_text("🎉 Verification successful! You are now sponsor verified.")
     else:
