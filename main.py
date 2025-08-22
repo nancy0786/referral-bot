@@ -34,7 +34,7 @@ INDEX_FILENAME = "backup_index"
 # ========================
 from handlers.start import start
 from handlers.force_join import handle_recheck_join, RECHECK_BTN_DATA
-from handlers.sponsor_verify import handle_forward
+
 from handlers.menu import send_main_menu, handle_menu_callback
 from handlers.videos import (
     video_menu,
