@@ -6,7 +6,7 @@ import config
 from telegram import Update
 from telegram.ext import ContextTypes
 from handlers.force_join import is_member, prompt_join
-from handlers.sponsor_verify import ask_sponsor_verification
+from handlers.sponsor_verify import auto_verify_sponsor
 from handlers.menu import send_main_menu
 from utils.db import json_get_user as get_user, json_save_user as save_user, set_invited_by, add_pending_referral
 
