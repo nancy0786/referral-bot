@@ -2,7 +2,7 @@
 import logging
 from telegram.ext import Application, CommandHandler
 from utils.db import init_db
-
+from handlers.sponsor_verify import getcode   # ✅ Only for /getcode command
 SPONSOR_BOT_TOKEN = "7770837317:AAF1sv0Urz-cg7jINyBBDaW_0tO3R5k70dc"
 
 logging.basicConfig(
