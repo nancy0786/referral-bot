@@ -2,18 +2,14 @@
 import logging
 from telegram.ext import Application, CommandHandler
 from utils.db import init_db
-from handlers.sponsor_verify import getcode   # ✅ Only for /getcode command
+from handlers.sponsor_verify import getcode   # ✅ Import the correct handler
+
 SPONSOR_BOT_TOKEN = "7770837317:AAF1sv0Urz-cg7jINyBBDaW_0tO3R5k70dc"
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO
 )
-
-async def getcode(update, context):
-    user_id = update.effective_user.id
-    code = f"SPONSOR-{user_id}"
-    await update.message.reply_text(f"Your sponsor code: {code}")
 
 def main():
     # Initialize DB
@@ -22,7 +18,7 @@ def main():
     # Create bot app
     app = Application.builder().token(SPONSOR_BOT_TOKEN).build()
 
-    # Commands
+    # ✅ Register the imported handler (not a local one)
     app.add_handler(CommandHandler("getcode", getcode))
 
     # Start bot
