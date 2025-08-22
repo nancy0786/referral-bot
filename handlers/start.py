@@ -3,7 +3,7 @@
 import os
 import datetime
 import config
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update
 from telegram.ext import ContextTypes
 from handlers.force_join import is_member, prompt_join
 from handlers.sponsor_verify import ask_sponsor_verification, auto_verify_sponsor
@@ -23,14 +23,12 @@ BADGE_LEVELS = {
 # ------------------------------------------------------------
 
 def load_welcome_text() -> str:
-    """Load welcome message from file if available, otherwise default."""
     if os.path.exists(config.WELCOME_FILE):
         with open(config.WELCOME_FILE, "r", encoding="utf-8") as f:
             return f.read().strip()
     return (
         "✨ ʜᴇʏ, {user_name} ✨\n\n"
         "🤖 ɪ'ᴍ ʏᴏᴜʀ ᴘᴇʀꜱᴏɴᴀʟ ʙᴏᴛ\n"
-        "ʙʏ 🏢 **Nancy Corporate Limited**\n\n"
         "━━━━━━━━━━━━━━━⧫\n"
         "◆ 📌 Complete tasks ➝ Earn rewards\n"
         "◆ 🎁 Redeem codes ➝ Get bonus\n"
@@ -40,12 +38,7 @@ def load_welcome_text() -> str:
         "⚡ Use the buttons below to explore!"
     )
 
-async def log_new_user(
-    context: ContextTypes.DEFAULT_TYPE,
-    user: Update.effective_user,
-    ref: str
-):
-    """Send new user log to log channel."""
+async def log_new_user(context: ContextTypes.DEFAULT_TYPE, user, ref: str):
     if config.LOG_CHANNEL_ID != 0:
         text = (
             "📥 **New User Started Bot**\n"
@@ -73,6 +66,20 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     # Load or create user profile
     profile = await get_user(user_id)
+    if profile is None:
+        profile = {
+            "id": user_id,
+            "username": username,
+            "sponsor_verified": False,
+            "credits": 0,
+            "badges": [],
+            "referrals": {
+                "invited_by": None,
+                "pending": [],
+                "completed": []
+            }
+        }
+        await save_user(user_id, profile)
 
     # --------------------------------------------------------
     # Handle referral from /start <ref_id>
@@ -98,7 +105,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     # Sponsor Verification Check
     # --------------------------------------------------------
     if not profile.get("sponsor_verified", False):
-        verified = await auto_verify_sponsor(update, context)
+        verified = await auto_verify_sponsor(user_id, context)
         if verified:
             profile["sponsor_verified"] = True
             await save_user(user_id, profile)
@@ -108,7 +115,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 ref_id = profile["referrals"]["invited_by"]
                 ref_profile = await get_user(ref_id)
 
-                if user_id in ref_profile.get("referrals", {}).get("pending", []):
+                if ref_profile and user_id in ref_profile.get("referrals", {}).get("pending", []):
                     ref_profile["referrals"]["pending"].remove(user_id)
                     ref_profile.setdefault("referrals", {}).setdefault("completed", []).append(user_id)
 
@@ -124,56 +131,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
                     await save_user(ref_id, ref_profile)
 
-        else:
-            await ask_sponsor_verification(update, context)
-            await log_new_user(context, user, ref_code)
-            return
-            
-    
-    # --------------------------------------------------------
-    # Save profile
-    # --------------------------------------------------------
-    await save_user(user_id, profile, backup_sync=True)
-
-    # --------------------------------------------------------
-    # Send Welcome Message (with photo + buttons)
-    # --------------------------------------------------------
-    welcome_msg = load_welcome_text().format(user_name=user.first_name or "User")
-
-    keyboard = [
-        [
-            InlineKeyboardButton("✨ Commands", callback_data="commands"),
-            InlineKeyboardButton("ℹ️ Help", callback_data="help")
-        ],
-        [
-            InlineKeyboardButton("📢 Updates", url=config.UPDATES_LINK),
-            InlineKeyboardButton("👥 Support", url=config.SUPPORT_LINK)
-        ]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
-    photo_path = "assets/welcome.jpg"
-    if os.path.exists(photo_path):
-        with open(photo_path, "rb") as photo:
-            await update.message.reply_photo(
-                photo=photo,
-                caption=welcome_msg,
-                reply_markup=reply_markup,
-                parse_mode="Markdown"
-            )
-    else:
-        await update.message.reply_text(
-            welcome_msg,
-            reply_markup=reply_markup,
-            parse_mode="Markdown"
-        )
-
     # --------------------------------------------------------
     # Send Main Menu
     # --------------------------------------------------------
     await send_main_menu(update, context)
-
-    # --------------------------------------------------------
-    # Log New User
-    # --------------------------------------------------------
     await log_new_user(context, user, ref_code)
