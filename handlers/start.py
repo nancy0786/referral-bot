@@ -98,7 +98,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     # Sponsor Verification Check
     # --------------------------------------------------------
     if not profile.get("sponsor_verified", False):
-        verified = await auto_verify_sponsor(user_id, context)
+        verified = await auto_verify_sponsor(update, context)
         if verified:
             profile["sponsor_verified"] = True
             await save_user(user_id, profile)
