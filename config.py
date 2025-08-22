@@ -24,6 +24,7 @@ WELCOME_FILE = os.path.join("data", "welcome.txt")
 # Sponsor bot details
 SPONSOR_BOT_USERNAME = os.getenv("SPONSOR_BOT_USERNAME", "").strip()
 SPONSOR_BOT_ID = int(os.getenv("SPONSOR_BOT_ID", "0").strip())
+SPONSOR_BOT_TOKEN = os.getenv("SPONSOR_BOT_TOKEN", "").strip()
 
 # Redeem code configuration
 REDEEM_CODE_LENGTH = 16
