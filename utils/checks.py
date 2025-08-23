@@ -8,7 +8,14 @@ from plan_system import PLANS
 
 async def check_plan(user: dict):
     """Check user plan limits and expiry."""
-    plan_name = user.get("plan", {}).get("name", "free")
+    plan_data = user.get("plan", {})
+
+    # 🔧 Fix: If plan is stored as string, wrap it in dict
+    if isinstance(plan_data, str):
+        plan_data = {"name": plan_data}
+        user["plan"] = plan_data   # keep DB consistent
+
+    plan_name = plan_data.get("name", "free")
     plan = PLANS.get(plan_name.lower(), PLANS["free"])
     
     # Ensure start_date exists
