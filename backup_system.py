@@ -42,11 +42,27 @@ async def backup_user_data(user_id: int, user_file_path: str):
       1️⃣ Local backup in /backups
       2️⃣ Upload to Telegram backup channel (single file per user)
          -> Deletes old backup message first
+         -> Only sends if content changed
     """
     # 1️⃣ Local backup copy
     backup_path = os.path.join(BACKUP_FOLDER, f"{user_id}.json")
+
+    # Check if file changed
+    send_backup = True
+    if os.path.exists(backup_path):
+        async with aiofiles.open(backup_path, "r", encoding="utf-8") as f:
+            old_data = await f.read()
+        async with aiofiles.open(user_file_path, "r", encoding="utf-8") as f:
+            new_data = await f.read()
+        if old_data == new_data:
+            send_backup = False  # No changes, skip sending
+
     shutil.copy(user_file_path, backup_path)
     print(f"[Backup] Local backup created for user {user_id} at {backup_path}")
+
+    if not send_backup:
+        print(f"[Backup] No changes detected for user {user_id}, skipping Telegram upload")
+        return
 
     # 2️⃣ Telegram backup
     if BACKUP_CHANNEL_ID and BOT_TOKEN:
@@ -65,7 +81,6 @@ async def backup_user_data(user_id: int, user_file_path: str):
         # Send new backup
         try:
             async with aiofiles.open(backup_path, "rb") as f:
-                # python-telegram-bot v20 requires sync file, workaround: read bytes
                 data_bytes = await f.read()
 
             sent = await bot.send_document(
@@ -82,8 +97,6 @@ async def backup_user_data(user_id: int, user_file_path: str):
 
         except Exception as e:
             print(f"[Backup] Failed to send backup to Telegram: {e}")
-
-
 def backup_user_data_sync(user_id: int, user_file_path: str):
     """Synchronous wrapper"""
     asyncio.run(backup_user_data(user_id, user_file_path))
