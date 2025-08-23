@@ -531,4 +531,5 @@ async def save_user_data(user_id: int, data: dict):
     user["active_messages"] = data.get("active_messages", user.get("active_messages", []))
     user["tasks_completed"] = data.get("tasks_completed", user.get("tasks_completed", []))
 
-    await save_user(user_id, user["username"], user["credits"], user["plan"]["name"], user["plan"]["expires_at"])
+    # ✅ Fix: pass full dict to save_user
+    await save_user(user_id, user)
