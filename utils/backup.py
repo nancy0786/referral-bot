@@ -63,15 +63,21 @@ async def update_user_backup(user_id: int, local_filepath: str, new_data: Dict[s
     str_uid = str(user_id)
     prev = index.get(str_uid)
 
+    # Exclude trivial fields from change detection
+    ignore_keys = ["last_active", "active_messages"]
+    filtered_new_data = {k: v for k, v in new_data.items() if k not in ignore_keys}
+
     # Check if data has changed
     old_json = None
     if prev and "last_data" in prev:
         try:
-            old_json = json.loads(prev["last_data"])
+            old_data = json.loads(prev["last_data"])
+            filtered_old_data = {k: v for k, v in old_data.items() if k not in ignore_keys}
+            old_json = filtered_old_data
         except Exception:
             pass
-    if old_json == new_data:
-        # No change, skip upload
+    if old_json == filtered_new_data:
+        # No significant change, skip upload
         return
 
     # Delete previous messages if exist
@@ -101,7 +107,14 @@ async def update_user_backup(user_id: int, local_filepath: str, new_data: Dict[s
         text_str = json.dumps(new_data, ensure_ascii=False, indent=2)
         text_msg = await bot.send_message(
             chat_id=config.PRIVATE_DB_CHANNEL_ID,
-            text=f"User {user_id} details:\n<pre>{text_str}</pre>",
+            text=(
+                f"User {user_id} details:\n"
+                f"Name: {new_data.get('username')}\n"
+                f"Plan: {new_data.get('plan', {}).get('name') if isinstance(new_data.get('plan'), dict) else new_data.get('plan')}\n"
+                f"Credits: {new_data.get('credits', 0)}\n"
+                f"ID: {user_id}\n"
+                f"<pre>{text_str}</pre>"
+            ),
             parse_mode="HTML"
         )
     except Exception as e:
@@ -117,7 +130,6 @@ async def update_user_backup(user_id: int, local_filepath: str, new_data: Dict[s
         "last_data": json.dumps(new_data, ensure_ascii=False)  # keep raw data for change detection
     }
     await write_index_to_pinned(bot, index)
-
 async def restore_all_from_index() -> Dict[str, str]:
     """
     Downloads all files referenced in pinned index into local DB folder.
