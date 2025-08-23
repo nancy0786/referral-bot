@@ -6,6 +6,7 @@ from utils.db import get_user, save_user
 from handlers.force_join import is_member, prompt_join
 from utils.db import get_user, save_user
 from config import PLANS
+from plan_system import PLANS
 
 async def ensure_access(update, context):
     """Ensure user has completed force join + sponsor verification before using bot."""
