@@ -7,10 +7,8 @@ import time
 from config import ADMIN_IDS
 import re
 from utils.db import add_fetched_video
-from utils.checks import ensure_access   # ✅ import access check
+from utils.checks import ensure_access, check_plan  # ✅ import plan check
 from utils.db import add_or_update_category, get_all_categories
-
-
 
 # -----------------------------
 # Config
@@ -93,7 +91,6 @@ async def fetch_videos(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "⚠️ Old videos cannot be fetched due to Telegram Bot API limitations."
     )
 
-
 # -----------------------------
 # Auto-fetch new channel videos
 # -----------------------------
@@ -141,40 +138,28 @@ async def get_video_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await ensure_access(update, context):
         return
 
+    user_id = update.effective_user.id
+    user = await get_user_data(user_id)
+
+    # ✅ Plan check
+    ok, msg = await check_plan(user)
+    if not ok:
+        await update.message.reply_text(msg)
+        return
+
     if not context.args:
         await update.message.reply_text("⚙️ Usage: /video <number>")
         return
 
     vid_num = context.args[0].lstrip("#")
-    user_id = update.effective_user.id
-    data = await get_user_data(user_id)
-
-    plan = data.get("plan", "free")
-    credits = data.get("credits", 0)
-    expiry = data.get("plan_expiry", 0)
-    now = time.time()
-
-    if plan == "premium":
-        if expiry and now > expiry:
-            data["plan"] = "free"
-            await save_user_data(user_id, data)
-            await update.message.reply_text("⚠️ Premium expired. Upgrade required.")
-            return
-    elif plan == "credit":
-        if credits > 0:
-            data["credits"] -= 1
-            await save_user_data(user_id, data)
-        else:
-            await update.message.reply_text("💳 Not enough credits.")
-            return
-    elif plan == "free":
-        await update.message.reply_text("⛔ Free plan cannot access this video.")
-        return
-
     video_file_id = get_video(vid_num)
     if not video_file_id:
         await update.message.reply_text("❌ Video not found in DB. Ask admin to run /fetchvid.")
         return
+
+    # Increment usage
+    user["usage"]["videos_watched_today"] += 1
+    await save_user_data(user_id, user)
 
     await update.message.reply_video(video_file_id, caption=f"🎥 Video {vid_num}")
 
@@ -211,11 +196,7 @@ async def categories_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
     msg = "\n".join([f"📂 {c[0]} → {c[1]}" for c in cats])
     await update.message.reply_text(f"📂 Categories:\n{msg}")
 
-
-
-
 async def videodetails_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """User command: show video categories list."""
     categories = get_all_categories()
     if not categories:
         return await update.message.reply_text("⚠️ No video categories available.")
@@ -223,6 +204,7 @@ async def videodetails_command(update: Update, context: ContextTypes.DEFAULT_TYP
     for cat, vids in categories:
         msg += f"🔹 {cat}: {vids}\n"
     await update.message.reply_text(msg)
+
 # -----------------------------
 # Existing logic (unchanged)
 # -----------------------------
@@ -238,34 +220,21 @@ async def handle_video_number(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     vid_num = update.message.text.strip()
     user_id = update.effective_user.id
-    data = await get_user_data(user_id)
+    user = await get_user_data(user_id)
 
-    plan = data.get("plan", "free")
-    credits = data.get("credits", 0)
-    expiry = data.get("plan_expiry", 0)
-    now = time.time()
-
-    if plan == "premium":
-        if expiry and now > expiry:
-            data["plan"] = "free"
-            await save_user_data(user_id, data)
-            await update.message.reply_text("⚠️ Your Premium plan expired. Upgrade needed.")
-            return
-    elif plan == "credit":
-        if credits > 0:
-            data["credits"] -= 1
-            await save_user_data(user_id, data)
-        else:
-            await update.message.reply_text("💳 No credits left. Complete tasks or upgrade plan.")
-            return
-    elif plan == "free":
-        await update.message.reply_text("🔓 Free plan: Only limited videos available. Upgrade for full access.")
+    ok, msg = await check_plan(user)
+    if not ok:
+        await update.message.reply_text(msg)
         return
 
     video_file_id = get_video(vid_num)
     if not video_file_id:
         await update.message.reply_text("❌ Video not found in DB. Ask admin to run /fetchvid.")
         return
+
+    # Increment usage
+    user["usage"]["videos_watched_today"] += 1
+    await save_user_data(user_id, user)
 
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("⬇️ Download", callback_data=f"download_{vid_num}")]
@@ -277,34 +246,21 @@ async def handle_download_video(update: Update, context: ContextTypes.DEFAULT_TY
     query = update.callback_query
     vid_num = query.data.replace("download_", "")
     user_id = query.from_user.id
-    data = await get_user_data(user_id)
+    user = await get_user_data(user_id)
 
-    plan = data.get("plan", "free")
-    credits = data.get("credits", 0)
-    expiry = data.get("plan_expiry", 0)
-    now = time.time()
-
-    if plan == "premium":
-        if expiry and now > expiry:
-            data["plan"] = "free"
-            await save_user_data(user_id, data)
-            await query.edit_message_text("⚠️ Premium expired. Cannot download.")
-            return
-    elif plan == "credit":
-        if credits > 0:
-            data["credits"] -= 1
-            await save_user_data(user_id, data)
-        else:
-            await query.answer("💳 No credits left.", show_alert=True)
-            return
-    elif plan == "free":
-        await query.answer("⛔ Free plan cannot download videos.", show_alert=True)
+    ok, msg = await check_plan(user)
+    if not ok:
+        await query.answer(msg, show_alert=True)
         return
 
     video_file_id = get_video(vid_num)
     if not video_file_id:
         await query.answer("❌ Video not found in DB.", show_alert=True)
         return
+
+    # Increment usage
+    user["usage"]["downloads_per_day"] += 1
+    await save_user_data(user_id, user)
 
     await query.message.reply_video(video_file_id, caption=f"⬇️ Download Video {vid_num}")
     await query.answer("🎉 Video sent for download!")
