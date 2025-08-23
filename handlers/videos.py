@@ -142,7 +142,7 @@ async def get_video_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = await get_user_data(user_id)
 
     # ✅ Plan check
-    ok, msg = await check_plan(user)
+    ok, msg = await check_plan(user, mode="video")
     if not ok:
         await update.message.reply_text(msg)
         return
@@ -222,7 +222,8 @@ async def handle_video_number(update: Update, context: ContextTypes.DEFAULT_TYPE
     user_id = update.effective_user.id
     user = await get_user_data(user_id)
 
-    ok, msg = await check_plan(user)
+    # inside get_video_command
+    ok, msg = await check_plan(user, mode="video")
     if not ok:
         await update.message.reply_text(msg)
         return
@@ -248,7 +249,8 @@ async def handle_download_video(update: Update, context: ContextTypes.DEFAULT_TY
     user_id = query.from_user.id
     user = await get_user_data(user_id)
 
-    ok, msg = await check_plan(user)
+    # inside get_video_command
+    ok, msg = await check_plan(user, mode="video")
     if not ok:
         await query.answer(msg, show_alert=True)
         return
