@@ -6,7 +6,8 @@ from utils.db import get_user, save_user
 from plan_system import PLANS
 
 
-async def check_plan(user: dict):
+# --- update function signature ---
+async def check_plan(user: dict, mode: str = "video"):
     """Check user plan limits and expiry."""
     plan_data = user.get("plan", {})
 
@@ -41,17 +42,18 @@ async def check_plan(user: dict):
         user["usage"]["last_watch_reset"] = str(today)
         await save_user(user.get("user_id"), user)
 
-    # Check videos per day
-    videos_per_day = plan.get("videos_per_day", -1)
-    videos_watched = user.get("usage", {}).get("videos_watched_today", 0)
-    if videos_per_day != -1 and videos_watched >= videos_per_day:
-        return False, f"⚠️ Your {plan_name} plan allows only {videos_per_day} videos per day. Wait until tomorrow or upgrade your plan."
+    # ✅ Only check what the mode requires
+    if mode == "video":
+        videos_per_day = plan.get("videos_per_day", -1)
+        videos_watched = user.get("usage", {}).get("videos_watched_today", 0)
+        if videos_per_day != -1 and videos_watched >= videos_per_day:
+            return False, f"⚠️ Your {plan_name} plan allows only {videos_per_day} videos per day. Wait until tomorrow or upgrade your plan."
 
-    # Check downloads per day
-    downloads_limit = plan.get("downloads_per_day", -1)
-    downloads_done = user.get("usage", {}).get("downloads_per_day", 0)
-    if downloads_limit != -1 and downloads_done >= downloads_limit:
-        return False, f"⚠️ Your {plan_name} plan allows only {downloads_limit} downloads per day. Wait until tomorrow or upgrade your plan."
+    if mode == "download":
+        downloads_limit = plan.get("downloads_per_day", -1)
+        downloads_done = user.get("usage", {}).get("downloads_per_day", 0)
+        if downloads_limit != -1 and downloads_done >= downloads_limit:
+            return False, f"⚠️ Your {plan_name} plan allows only {downloads_limit} downloads per day. Wait until tomorrow or upgrade your plan."
 
     # Check credits
     credits_limit = plan.get("credits", -1)
