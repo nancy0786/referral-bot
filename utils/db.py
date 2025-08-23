@@ -133,25 +133,15 @@ async def save_user(user_id: int, data: Dict[str, Any], backup_sync: bool = True
         except Exception:
             pass
 
-    # Backup to Telegram channel (async fire-and-forget)
-    if backup_sync and getattr(config, "PRIVATE_DB_CHANNEL_ID", 0) != 0:
-        try:
-            async def _backup():
-                # ✅ pass `data` to let backup.py check for changes
-                await backup.update_user_backup(user_id, path, data)
-            asyncio.create_task(_backup())
-        except Exception as e:
-            print(f"[DB Backup] Failed to schedule backup for user {user_id}: {e}")
-
-    # Backup to Telegram channel (async fire-and-forget)
-    if backup_sync and getattr(config, "PRIVATE_DB_CHANNEL_ID", 0) != 0:
-        try:
-            async def _backup():
-                await backup.update_user_backup(user_id, path)
-            asyncio.create_task(_backup())
-        except Exception as e:
-            print(f"[DB Backup] Failed to schedule backup for user {user_id}: {e}")
-
+# Backup to Telegram channel (async fire-and-forget)
+if backup_sync and getattr(config, "PRIVATE_DB_CHANNEL_ID", 0) != 0:
+    try:
+        async def _backup():
+            # ✅ pass `data` to let backup.py check for changes
+            await backup.update_user_backup(user_id, path, data)
+        asyncio.create_task(_backup())
+    except Exception as e:
+        print(f"[DB Backup] Failed to schedule backup for user {user_id}: {e}")
 
 async def set_invited_by(user_id: int, inviter_id: int) -> None:
     """Set who invited a user"""
