@@ -149,22 +149,12 @@ async def restore_all_from_index() -> Dict[str, str]:
             if not file_msg_id:
                 results[str_uid] = "no_file_message"
                 continue
-            # get document again by ID
-            results[str_uid] = "manual restore needed"  # simplified
+            # simplified manual restore
+            results[str_uid] = "manual restore needed"
         except Exception as e:
             results[str_uid] = f"error: {e}"
-    return results    Downloads all files referenced in pinned index into local DB folder.
-    Returns dict {user_id: 'ok'/'error:...'}.
-    """
-    results = {}
-    if config.PRIVATE_DB_CHANNEL_ID == 0:
-        return results
 
-    bot = await _get_bot()
-    index = await read_index_from_pinned(bot)
-    import os
-    os.makedirs(config.DATA_FOLDER, exist_ok=True)
-
+    # Second block for actual file download if file_id exists
     for str_uid, info in index.items():
         try:
             file_id = info.get("file_id")
@@ -177,4 +167,5 @@ async def restore_all_from_index() -> Dict[str, str]:
             results[str_uid] = "ok"
         except Exception as e:
             results[str_uid] = f"error: {e}"
+
     return results
