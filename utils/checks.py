@@ -63,7 +63,7 @@ async def check_plan(user: dict, mode: str = "video"):
     return True, None
 
 
-async def ensure_access(update, context):
+async def ensure_access(update, context, mode="video"):
     """Ensure user has completed force join, sponsor verification, and plan limits."""
     user = update.effective_user
     user_id = user.id
@@ -80,7 +80,7 @@ async def ensure_access(update, context):
         return False
 
     # 3️⃣ Plan validation
-    ok, msg = await check_plan(profile)
+    ok, msg = await check_plan(profile, mode=mode)  # ✅ pass mode
     if not ok:
         await update.message.reply_text(msg)
         return False
