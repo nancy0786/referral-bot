@@ -11,12 +11,17 @@ async def check_plan(user: dict, mode: str = "video"):
     """Check user plan limits and expiry."""
     plan_data = user.get("plan", {})
 
-    # 🔧 Fix: If plan is stored as string, wrap it in dict
+    # 🔧 Handle plan_data correctly (string, dict, or invalid)
     if isinstance(plan_data, str):
-        plan_data = {"name": plan_data}
-        user["plan"] = plan_data   # keep DB consistent
+        plan_name = plan_data
+        user["plan"] = {"name": plan_name}   # keep DB consistent
+    elif isinstance(plan_data, dict):
+        plan_name = plan_data.get("name", "free")
+    else:
+        plan_name = "free"
 
-    plan_name = plan_data.get("name", "free")
+    # ✅ Always force plan_name to string
+    plan_name = str(plan_name)
     plan = PLANS.get(plan_name.lower(), PLANS["free"])
     
     # Ensure start_date exists
@@ -61,7 +66,6 @@ async def check_plan(user: dict, mode: str = "video"):
         return False, f"⚠️ Your {plan_name} plan allows max {credits_limit} credits. Upgrade your plan to earn more."
 
     return True, None
-
 
 async def ensure_access(update, context, mode="video"):
     """Ensure user has completed force join, sponsor verification, and plan limits."""
